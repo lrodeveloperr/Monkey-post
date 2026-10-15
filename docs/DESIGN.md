@@ -132,6 +132,45 @@ A person's AI teammates always play at Medium.
 
 ---
 
+## 3a. Progression and unlockables
+
+**Status: confirmed by owner (Part 5).**
+
+- Matches earn **coins**, which players spend in a **shop**. Coins can never be bought: there are
+  no purchases.
+- **Unlockables:** kits and badges, balls, pitches, goal celebrations.
+- **Pace: steady.** A common item every 2–3 matches, a pitch or celebration every 15–20.
+- **Rewarded ad:** offered on the full-time screen to **double that match's coins**.
+- **Daily first-win bonus:** the first win each day pays extra coins. No streaks to lose.
+- **Cup-winner items:** exclusive items for winning each cup level (e.g. a gold ball for the Hard
+  cup). They can't be bought with coins.
+- **Local 1v1** pays a smaller amount, so two friends can't farm coins by letting each other win.
+- Coins and unlocks are saved on the phone and in Play Games Saved Games.
+
+**Starting economy (to be tuned from playtests):**
+
+| Earning | Coins |
+|---|---|
+| Finishing a match | 20 |
+| Each goal scored (max 5 counted) | 10 |
+| Win / draw | 30 / 10 |
+| Difficulty multiplier | Easy ×1, Medium ×1.5, Hard ×2 |
+| Cup winner bonus | Easy 150, Medium 250, Hard 400 (plus that level's exclusive item) |
+| Daily first win | +100 |
+| Rewarded ad | doubles the match's coins (not the daily or cup bonus) |
+| Local 1v1 match | flat 25, for up to 10 matches a day |
+
+| Shop item | Price |
+|---|---|
+| Kit colours / pattern, badge, ball | 150–250 |
+| Goal celebration | 1,200 |
+| Pitch | 1,500 |
+
+A Medium win with two goals pays (20 + 20 + 30) × 1.5 = 105 coins, so a common item takes about
+2 matches and a pitch about 15. That matches the "steady" pace.
+
+---
+
 ## 4. Architecture
 
 ```
@@ -218,8 +257,8 @@ retired Play Games real-time multiplayer in 2020, and any replacement needs a se
   capping and fraud prevention. If consent is refused, Google serves limited ads.
 - **Interstitial:** only on the full-time screen, after every 2nd match, at most one every
   3 minutes. Never at launch or mid-match (Play policy).
-- **Rewarded:** optional, player-initiated. "Watch an ad to unlock this kit / ball / pitch."
-  Everything is also unlockable through play (XP), so ads are never required.
+- **Rewarded:** optional, player-initiated, on the full-time screen: "Watch an ad to double your
+  coins." Everything can be earned by playing, so ads are never required.
 - In local 1v1 each phone shows its own ads on its own full-time screen.
 - **app-ads.txt** must be hosted on the developer website listed on the store page. A free
   GitHub Pages site works and can also host the privacy policy.
@@ -304,7 +343,8 @@ Run the tests with `dotnet test dotnet/MonkeyPost.Core.Tests`.
    bots, full-time screen.
 3. Nearby Connections bridge + local 1v1 lobby (host / join).
 4. Play Games Services: sign-in, achievements, leaderboards, Saved Games.
-5. AdMob + UMP, unlockables (kits, balls, pitches), interstitial and rewarded placements.
+5. Coins and shop (kits, badges, balls, pitches, celebrations), cup-winner items, AdMob + UMP,
+   interstitial and rewarded placements.
 6. Localization, audio (crowd, whistle), polish on low-end devices.
 7. Privacy policy, app-ads.txt, Data Safety form, store listing, closed test → production.
 
