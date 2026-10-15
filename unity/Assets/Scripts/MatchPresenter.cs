@@ -28,7 +28,8 @@ namespace MonkeyPost.Game
         };
 
         readonly MatchConfig _config;
-        readonly FootballerView[] _footballers = new FootballerView[MatchSimulation.PlayerCount];
+        readonly IFootballerView[] _footballers = new IFootballerView[MatchSimulation.PlayerCount];
+        readonly int[] _touchSerials = new int[MatchSimulation.PlayerCount];
         readonly BallView _ball;
         readonly Vector3[] _previous = new Vector3[MatchSimulation.PlayerCount];
         readonly Vector3[] _current = new Vector3[MatchSimulation.PlayerCount];
@@ -59,13 +60,26 @@ namespace MonkeyPost.Game
             var root = new GameObject("Match").transform;
             root.SetParent(parent, false);
 
+            // Rigged, animated characters once the art is imported; primitive placeholders until then.
+            var library = new AnimationLibrary();
             for (int id = 0; id < MatchSimulation.PlayerCount; id++)
             {
                 int team = MatchSimulation.TeamOf(id);
-                bool keeper = MatchSimulation.SlotOf(id) == 0;
+                int slot = MatchSimulation.SlotOf(id);
+                bool keeper = slot == 0;
                 var kit = team == 0 ? (keeper ? HomeKeeper : HomeKit) : (keeper ? AwayKeeper : AwayKit);
                 var shorts = team == 0 ? HomeShorts : AwayShorts;
-                _footballers[id] = new FootballerView(root, $"Player {id}", kit, shorts, SkinTones[id % SkinTones.Length]);
+                if (library.Available)
+                {
+                    var skin = library.Skins.Length > 0 ? library.Skins[id % library.Skins.Length] : null;
+                    int number = keeper ? 1 : slot + (team == 0 ? 1 : 5);
+                    _footballers[id] = new RiggedFootballer(root, $"Player {id}", library, kit, skin, number, keeper,
+                        config.JogSpeed, config.SprintSpeed);
+                }
+                else
+                {
+                    _footballers[id] = new FootballerView(root, $"Player {id}", kit, shorts, SkinTones[id % SkinTones.Length]);
+                }
             }
             _ball = new BallView(root);
             _cameraX = config.PitchLength / 2f;
@@ -80,6 +94,7 @@ namespace MonkeyPost.Game
             _accumulator = 0f;
             GoalBanner = 0f;
             LastGoalTeam = -1;
+            for (int id = 0; id < MatchSimulation.PlayerCount; id++) _touchSerials[id] = _match.Simulation.Players[id].TouchSerial;
             Capture();
             Capture();
         }
@@ -137,8 +152,10 @@ namespace MonkeyPost.Game
                 _match.SetInput(HumanTeam, _pending);
                 _match.Tick(TickSeconds);
                 Capture();
+                AnimateTouches();
                 foreach (var e in _match.Simulation.Events)
                 {
+                    AnimateEvent(e);
                     if (e.Type == MatchEventType.Goal)
                     {
                         GoalBanner = GoalBannerSeconds;
@@ -158,6 +175,47 @@ namespace MonkeyPost.Game
             }
             GoalBanner = Mathf.Max(0f, GoalBanner - dt);
             SkillBannerTime = Mathf.Max(0f, SkillBannerTime - dt);
+        }
+
+        /// <summary>Every new touch in the simulation becomes a foot-on-ball animation.</summary>
+        void AnimateTouches()
+        {
+            var sim = _match.Simulation;
+            for (int id = 0; id < MatchSimulation.PlayerCount; id++)
+            {
+                var p = sim.Players[id];
+                if (p.TouchSerial == _touchSerials[id]) continue;
+                _touchSerials[id] = p.TouchSerial;
+                var point = Art.ToWorld(p.LastTouchPoint.XY, p.LastTouchPoint.Z);
+                var direction = Art.ToWorld(p.LastTouchDirection);
+                _footballers[id].OnTouch(p.LastTouchKind, point, direction);
+            }
+        }
+
+        /// <summary>Reactions and celebrations (owner decision: a few short reactions, celebrations on goals).</summary>
+        void AnimateEvent(MatchEvent e)
+        {
+            switch (e.Type)
+            {
+                case MatchEventType.Goal:
+                    if (e.PlayerA >= 0 && MatchSimulation.TeamOf(e.PlayerA) == e.Team)
+                    {
+                        string celebration = e.Team == HumanTeam ? Celebrations.Equipped : Celebrations.RandomFree(e.PlayerA);
+                        _footballers[e.PlayerA].Celebrate(celebration);
+                    }
+                    break;
+                case MatchEventType.ShotOffTarget:
+                case MatchEventType.Post:
+                    if (e.PlayerA >= 0) _footballers[e.PlayerA].PlayReaction(Reaction.HeadInHands);
+                    break;
+                case MatchEventType.Tackle:
+                    _footballers[e.PlayerA].PlayReaction(Reaction.FistClench);
+                    if (e.PlayerB >= 0) _footballers[e.PlayerB].PlayReaction(Reaction.Stumble);
+                    break;
+                case MatchEventType.SkillBeat:
+                    if (e.Detail == (int)SkillMove.Nutmeg && e.PlayerB >= 0) _footballers[e.PlayerB].PlayReaction(Reaction.LookBack);
+                    break;
+            }
         }
 
         void Capture()
@@ -192,21 +250,29 @@ namespace MonkeyPost.Game
             var sim = _match.Simulation;
             float alpha = Mathf.Clamp01(_accumulator / TickSeconds);
             int controlled = _match.ControlledPlayer(HumanTeam);
+            var ballPosition = Vector3.Lerp(_ballPrevious, _ballCurrent, alpha);
+            float ballHeight = Mathf.Lerp(_ballHeightPrevious, _ballHeightCurrent, alpha);
+            var ballCentre = ballPosition + Vector3.up * (ballHeight + _config.BallRadius);
             for (int id = 0; id < MatchSimulation.PlayerCount; id++)
             {
                 var p = sim.Players[id];
-                _footballers[id].Show(
-                    Vector3.Lerp(_previous[id], _current[id], alpha),
-                    new Vector2(p.Facing.X, p.Facing.Y),
-                    p.Velocity.Length,
-                    id == controlled,
-                    p.StunTime > 0f,
-                    p.StretchTime > 0f,
-                    dt);
+                var pose = new FootballerPose
+                {
+                    Position = Vector3.Lerp(_previous[id], _current[id], alpha),
+                    Velocity = Art.ToWorld(p.Velocity),
+                    Facing = new Vector2(p.Facing.X, p.Facing.Y),
+                    Controlled = id == controlled,
+                    Stunned = p.StunTime > 0f,
+                    Sprinting = p.IsSprinting,
+                    Shielding = p.IsShielding,
+                    Stretching = p.StretchTime > 0f,
+                    StretchDirection = Art.ToWorld(p.StretchDirection),
+                    Keeper = p.IsKeeper,
+                    Ball = ballCentre,
+                };
+                _footballers[id].Show(pose, dt);
             }
 
-            var ballPosition = Vector3.Lerp(_ballPrevious, _ballCurrent, alpha);
-            float ballHeight = Mathf.Lerp(_ballHeightPrevious, _ballHeightCurrent, alpha);
             _ball.Show(ballPosition, ballHeight, sim.Ball.Spin, dt);
 
             PlaceCamera(camera, ballPosition.x, dt);

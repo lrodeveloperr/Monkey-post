@@ -15,6 +15,11 @@ namespace MonkeyPost.Core
         public readonly bool IsStunned;
         public readonly bool IsShielding;
         public readonly bool IsStretching;
+        public readonly int TouchSerial;
+        public readonly TouchKind LastTouchKind;
+        public readonly Vec3 LastTouchPoint;
+        public readonly Vec2 LastTouchDirection;
+        public readonly Vec2 StretchDirection;
 
         public PlayerSnapshot(PlayerState p)
         {
@@ -29,6 +34,11 @@ namespace MonkeyPost.Core
             IsStunned = p.StunTime > 0f;
             IsShielding = p.IsShielding;
             IsStretching = p.StretchTime > 0f;
+            TouchSerial = p.TouchSerial;
+            LastTouchKind = p.LastTouchKind;
+            LastTouchPoint = p.LastTouchPoint;
+            LastTouchDirection = p.LastTouchDirection;
+            StretchDirection = p.StretchDirection;
         }
 
         public bool IsKeeper => Slot == 0;

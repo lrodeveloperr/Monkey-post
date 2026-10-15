@@ -44,6 +44,20 @@ namespace MonkeyPost.Core
         public Vec2 Skill;
     }
 
+    /// <summary>What kind of touch a player last made on the ball (drives the animation layer).</summary>
+    public enum TouchKind
+    {
+        None,
+        Dribble,
+        Control,
+        Pass,
+        Shot,
+        Tackle,
+        Skill,
+        /// <summary>A keeper's stretched leg or a body deflection.</summary>
+        Block,
+    }
+
     public enum SkillMove
     {
         None,
@@ -78,6 +92,8 @@ namespace MonkeyPost.Core
         WallHit,
         /// <summary>Full time with the scores level in a cup tie: next goal wins.</summary>
         GoldenGoal,
+        /// <summary>A shot missed: hit the end wall beside or above the goal (Detail: 1 = over knee height, 0 = wide).</summary>
+        ShotOffTarget,
         /// <summary>A skill move was attempted (Detail = <see cref="SkillMove"/>).</summary>
         SkillAttempt,
         /// <summary>A skill move beat its defender (PlayerA beat PlayerB; Detail = <see cref="SkillMove"/>).</summary>
@@ -152,6 +168,13 @@ namespace MonkeyPost.Core
 
         /// <summary>Holding off a close defender with the body (automatic for a slow carrier).</summary>
         public bool IsShielding;
+
+        /// <summary>Increments on every touch, so the animation layer can spot new ones.</summary>
+        public int TouchSerial;
+        public TouchKind LastTouchKind;
+        /// <summary>Where the ball was (its centre) when touched, and the direction it was sent.</summary>
+        public Vec3 LastTouchPoint;
+        public Vec2 LastTouchDirection;
 
         /// <summary>After a nutmeg: slipping round this defender (no body collision with them) for a moment.</summary>
         public int SlipPast = -1;

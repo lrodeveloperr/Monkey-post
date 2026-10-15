@@ -263,6 +263,30 @@ A person's AI teammates always play at Medium.
 
 ---
 
+## 2d. Animation
+
+**Status: confirmed by owner.**
+
+- **Hybrid:** recorded clips (Mixamo motion capture) for running, idling, reactions and
+  celebrations, blended by speed; a **procedural layer driven by the physics** on top. Two-bone
+  leg IK puts the foot exactly where the simulation met the ball (kicks, touches, tackles, the
+  keeper's stretch), the body leans into acceleration, and the head follows the ball.
+- **Kicks:** instant contact with a quick follow-through, no wind-up delay, so it stays
+  responsive on a touchscreen.
+- **Model:** a free CC0 low-poly character (Kenney Animated Characters 2), Humanoid-retargeted.
+  One body with varied skins (skin tones and hairstyles). **Teams wear coloured street-football
+  bibs**, numbered on the back.
+- **Reactions:** head in hands after a miss or a shot over the posts, fist clench after winning a
+  tackle, stumble when tackled, a look back when nutmegged.
+- **Celebrations:** 2 free (Fist Pump, Arms Out) and 6 in the shop (Knee Slide, Street Dance,
+  Salute, Backflip, Shush the Crowd, Take a Bow).
+- **Assets:** the owner downloads the model and about 18 clips (list and settings in
+  [ANIMATION_ASSETS.md](ANIMATION_ASSETS.md)). They import automatically (Humanoid, in place,
+  looping by name). Until they're in, the primitive placeholder footballers are used, with the
+  same kicks, reactions and celebrations done procedurally.
+
+---
+
 ## 3a. Progression and unlockables
 
 **Status: confirmed by owner (Part 5).**

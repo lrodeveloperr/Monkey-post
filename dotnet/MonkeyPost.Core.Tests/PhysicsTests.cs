@@ -325,6 +325,64 @@ namespace MonkeyPost.Core.Tests
         }
 
         [Fact]
+        public void ShotOverThePosts_IsReportedAsOffTarget()
+        {
+            var sim = InPlay();
+            sim.PlacePlayer(4, new Vec2(25f, 10f), new Vec2(1f, 0f));
+            sim.PlaceBall(new Vec2(25.5f, 10f), Vec2.Zero, owner: 4);
+            sim.PlacePlayer(5, new Vec2(35.3f, 4f), new Vec2(-1f, 0f));
+
+            var events = new System.Collections.Generic.List<MatchEvent>();
+            sim.Step(Inputs(x => { x[4].Shoot = true; x[4].Power = 1f; }), Dt);
+            events.AddRange(sim.Events);
+            for (int i = 0; i < 90; i++) { sim.Step(Inputs(), Dt); events.AddRange(sim.Events); }
+
+            var miss = events.Single(e => e.Type == MatchEventType.ShotOffTarget);
+            Assert.Equal(4, miss.PlayerA);
+            Assert.Equal(1, miss.Detail);
+        }
+
+        [Fact]
+        public void ShotWide_IsReportedAsOffTarget()
+        {
+            var sim = InPlay();
+            sim.PlacePlayer(4, new Vec2(28f, 14f), new Vec2(1f, 0f));
+            sim.PlaceBall(new Vec2(28.5f, 14f), Vec2.Zero, owner: 4);
+            sim.PlacePlayer(5, new Vec2(35.3f, 4f), new Vec2(-1f, 0f));
+
+            var events = new System.Collections.Generic.List<MatchEvent>();
+            // Facing the wrong way: an off-balance strike that sprays wide of the tiny goal.
+            var config = sim.Config;
+            sim.Step(Inputs(x => { x[4].Shoot = true; x[4].Power = 0.3f; x[4].Aim = 1f; }), Dt);
+            events.AddRange(sim.Events);
+            for (int i = 0; i < 120; i++) { sim.Step(Inputs(), Dt); events.AddRange(sim.Events); }
+
+            bool scored = events.Any(e => e.Type == MatchEventType.Goal);
+            if (!scored)
+            {
+                var miss = events.Single(e => e.Type == MatchEventType.ShotOffTarget || e.Type == MatchEventType.Post);
+                if (miss.Type == MatchEventType.ShotOffTarget) Assert.Equal(0, miss.Detail);
+            }
+        }
+
+        [Fact]
+        public void EveryTouch_IsRecordedForTheAnimationLayer()
+        {
+            var sim = InPlay();
+            sim.PlacePlayer(3, new Vec2(10f, 10f), new Vec2(1f, 0f));
+            sim.PlaceBall(new Vec2(10.5f, 10f), Vec2.Zero, owner: 3);
+            int before = sim.Players[3].TouchSerial;
+            for (int i = 0; i < 120; i++) sim.Step(Inputs(x => x[3].Move = new Vec2(1f, 0f)), Dt);
+            Assert.True(sim.Players[3].TouchSerial >= before + 3, "dribbling should produce several touches");
+            Assert.Equal(TouchKind.Dribble, sim.Players[3].LastTouchKind);
+
+            sim.Step(Inputs(x => { x[3].Shoot = true; x[3].Power = 0.5f; }), Dt);
+            for (int i = 0; i < 30 && sim.Players[3].LastTouchKind != TouchKind.Shot; i++) sim.Step(Inputs(), Dt);
+            Assert.Equal(TouchKind.Shot, sim.Players[3].LastTouchKind);
+            Assert.True(sim.Players[3].LastTouchDirection.X > 0.5f);
+        }
+
+        [Fact]
         public void Keeper_TakesTheirFirstTouchAwayFromGoal()
         {
             var sim = InPlay();

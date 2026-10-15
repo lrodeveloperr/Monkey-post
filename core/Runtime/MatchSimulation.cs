@@ -43,6 +43,12 @@ namespace MonkeyPost.Core
         public int KickoffTeam { get; private set; }
         public int LastTouchPlayer { get; private set; } = -1;
 
+        /// <summary>Seconds of match played (including golden goal), for timing animations.</summary>
+        public float MatchTime { get; private set; }
+
+        // The shot currently in flight, to report misses.
+        int _shotInFlight = -1;
+
         /// <summary>The last player to play the ball on purpose (kick, touch, control), ignoring deflections.</summary>
         public int LastKickPlayer { get; private set; } = -1;
 
@@ -106,6 +112,7 @@ namespace MonkeyPost.Core
 
             _events.Clear();
             if (Phase == Phase.Ended) return;
+            MatchTime += dt;
 
             if (!IsGoldenGoal)
             {
@@ -363,11 +370,13 @@ namespace MonkeyPost.Core
             if (c.X < r)
             {
                 if (inMouth) { GoalScored(1); return true; }
+                ShotMissed(1);
                 HitWall(new Vec3(r, c.Y, c.Z), new Vec3(1f, 0f, 0f));
             }
             else if (c.X > Config.PitchLength - r)
             {
                 if (inMouth) { GoalScored(0); return true; }
+                ShotMissed(0);
                 HitWall(new Vec3(Config.PitchLength - r, c.Y, c.Z), new Vec3(-1f, 0f, 0f));
             }
 
@@ -375,6 +384,15 @@ namespace MonkeyPost.Core
             if (c.Y < r) HitWall(new Vec3(c.X, r, c.Z), new Vec3(0f, 1f, 0f));
             else if (c.Y > Config.PitchWidth - r) HitWall(new Vec3(c.X, Config.PitchWidth - r, c.Z), new Vec3(0f, -1f, 0f));
             return false;
+        }
+
+        /// <summary>A shot by <paramref name="attackingTeam"/> reached the end wall without going in.</summary>
+        void ShotMissed(int attackingTeam)
+        {
+            if (_shotInFlight < 0 || TeamOf(_shotInFlight) != attackingTeam) return;
+            bool over = Ball.Height > Config.GoalHeight;
+            _events.Add(new MatchEvent(MatchEventType.ShotOffTarget, _shotInFlight, team: attackingTeam, detail: over ? 1 : 0));
+            _shotInFlight = -1;
         }
 
         void HitWall(Vec3 clampedCentre, Vec3 normal)
@@ -448,7 +466,9 @@ namespace MonkeyPost.Core
             flat = flat.Rotate((_rng.NextFloat() + _rng.NextFloat() - 1f) * spread) * (1f - 0.15f * offBalance);
             plan.Velocity = new Vec3(flat, plan.Velocity.Z);
 
+            RecordTouch(p, TouchKind.Shot, plan.Velocity.XY);
             Kick(p, plan);
+            _shotInFlight = p.Id;
             _events.Add(new MatchEvent(MatchEventType.Shot, p.Id, team: p.Team));
         }
 
@@ -525,6 +545,7 @@ namespace MonkeyPost.Core
                 plan.Spin = BallPhysics.RollingSpin(flat, Config.BallRadius);
             }
 
+            RecordTouch(p, TouchKind.Pass, plan.Velocity.XY);
             Kick(p, plan);
             _events.Add(new MatchEvent(MatchEventType.Pass, p.Id, receiver?.Id ?? -1, p.Team, through ? 1 : 0));
         }
@@ -535,6 +556,15 @@ namespace MonkeyPost.Core
             if (kick.LengthSquared < 1e-6f) return 0f;
             float angle = (float)Math.Acos(Clamp(Vec2.Dot(p.Facing, kick.Normalized), -1f, 1f));
             return Clamp((angle - 1.05f) / 1.6f, 0f, 1f);
+        }
+
+        void RecordTouch(PlayerState p, TouchKind kind, Vec2 direction)
+        {
+            p.TouchSerial++;
+            p.LastTouchKind = kind;
+            p.LastTouchPoint = Ball.Body.Centre;
+            p.LastTouchDirection = direction.Normalized;
+            if (kind != TouchKind.Shot && kind != TouchKind.Block) _shotInFlight = -1;
         }
 
         void Kick(PlayerState p, KickPlan plan)
@@ -579,6 +609,7 @@ namespace MonkeyPost.Core
                 velocity = direction.Rotate(_rng.Range(-1f, 1f) * error) * (speed + lead * TouchPushPerLead);
             }
 
+            RecordTouch(p, TouchKind.Dribble, velocity - p.Velocity);
             Ball.Body.Velocity = new Vec3(velocity, Math.Min(0f, Ball.Body.Velocity.Z));
             Ball.Body.Spin = BallPhysics.RollingSpin(velocity, Config.BallRadius);
             p.TouchCooldown = Config.TouchCooldownSeconds;
@@ -692,6 +723,7 @@ namespace MonkeyPost.Core
             var direction = p.IsKeeper ? new Vec2(AttackDirection(p.Team), 0f) : DribbleDirection(p);
             var miss = new Vec2(1f, 0f).Rotate(_rng.Range(0f, 6.2831853f)) * (incoming * error);
             var velocity = p.Velocity + direction * 1.2f + miss;
+            RecordTouch(p, TouchKind.Control, direction);
             Ball.Body.Velocity = new Vec3(velocity, Math.Min(0f, Ball.Body.Velocity.Z) * 0.3f);
             Ball.Body.Spin = BallPhysics.RollingSpin(velocity, Config.BallRadius);
 
@@ -736,6 +768,7 @@ namespace MonkeyPost.Core
             var before = Ball.Body.Velocity;
             if (!BallPhysics.Contact(ref Ball.Body, normal, new Vec3(p.Velocity, 0f), Config.BodyRestitution, Config.BodyFriction, Config.BallRadius))
                 return;
+            RecordTouch(p, TouchKind.Block, Ball.Body.Velocity.XY);
             LastTouchPlayer = p.Id;
             if (Ball.Owner >= 0 && Ball.Owner != p.Id) Ball.Owner = -1;
             // A block deflects the ball; the blocker can't instantly kill the rebound at their feet.
@@ -771,6 +804,7 @@ namespace MonkeyPost.Core
             {
                 Ball.Owner = -1;
                 var knock = tackler.Facing.Rotate(_rng.Range(-0.4f, 0.4f)) * Config.TackleKnockSpeed + tackler.Velocity * 0.3f;
+                RecordTouch(tackler, TouchKind.Tackle, knock);
                 Ball.Body.Velocity = new Vec3(knock, 0f);
                 Ball.Body.Spin = BallPhysics.RollingSpin(knock, Config.BallRadius);
                 victim.StunTime = Config.TackledStunSeconds;
@@ -839,6 +873,7 @@ namespace MonkeyPost.Core
             else if (along < -0.6f) DragBack(p, direction);
             else StepOver(p, direction, swipe, defender);
 
+            RecordTouch(p, TouchKind.Skill, Ball.Velocity);
             _events.Add(new MatchEvent(MatchEventType.SkillAttempt, p.Id, p.SkillDefender, p.Team, (int)p.ActiveSkill));
         }
 
@@ -952,6 +987,7 @@ namespace MonkeyPost.Core
 
         void GoalScored(int team)
         {
+            _shotInFlight = -1;
             _score[team]++;
             Ball.Owner = -1;
             Ball.Body.Velocity = Vec3.Zero;

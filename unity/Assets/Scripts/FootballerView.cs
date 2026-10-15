@@ -1,9 +1,13 @@
+using MonkeyPost.Core;
 using UnityEngine;
 
 namespace MonkeyPost.Game
 {
-    /// <summary>A chunky placeholder footballer with a simple run cycle.</summary>
-    sealed class FootballerView
+    /// <summary>
+    /// A chunky placeholder footballer built from primitives, with a procedural run cycle, kicks,
+    /// reactions and a simple celebration. Used until the rigged character assets are imported.
+    /// </summary>
+    sealed class FootballerView : IFootballerView
     {
         static readonly Color Marker = new Color(1f, 0.85f, 0.1f);
 
@@ -13,6 +17,14 @@ namespace MonkeyPost.Game
         readonly GameObject _marker;
         float _phase;
         float _yaw;
+
+        // One-off actions.
+        float _kickTime = -1f;
+        bool _kickLeft;
+        float _kickStrength;
+        Reaction? _reaction;
+        float _reactionTime = -1f;
+        float _celebrationTime = -1f;
 
         public FootballerView(Transform parent, string name, Color kit, Color shorts, Color skin)
         {
@@ -39,30 +51,84 @@ namespace MonkeyPost.Game
             return pivot;
         }
 
-        public void Show(Vector3 position, Vector2 facing, float speed, bool controlled, bool stunned, bool stretching, float dt)
+        public void OnTouch(TouchKind kind, Vector3 point, Vector3 direction)
         {
-            _root.localPosition = position;
-            if (facing.sqrMagnitude > 0.01f)
+            if (kind == TouchKind.Block) return;
+            // Kick with the foot on the ball's side.
+            var local = _root.InverseTransformPoint(point);
+            _kickLeft = local.x < 0f;
+            _kickStrength = kind == TouchKind.Shot ? 1f : kind == TouchKind.Pass || kind == TouchKind.Tackle ? 0.7f : 0.35f;
+            _kickTime = 0f;
+        }
+
+        public void PlayReaction(Reaction reaction)
+        {
+            _reaction = reaction;
+            _reactionTime = 0f;
+        }
+
+        public void Celebrate(string celebrationId) => _celebrationTime = 0f;
+
+        public void Show(in FootballerPose pose, float dt)
+        {
+            _root.localPosition = pose.Position;
+            if (pose.Facing.sqrMagnitude > 0.01f)
             {
-                float target = Mathf.Atan2(facing.x, facing.y) * Mathf.Rad2Deg;
+                float target = Mathf.Atan2(pose.Facing.x, pose.Facing.y) * Mathf.Rad2Deg;
                 _yaw = Mathf.MoveTowardsAngle(_yaw, target, 720f * dt);
                 _root.localRotation = Quaternion.Euler(0f, _yaw, 0f);
             }
 
+            float speed = new Vector2(pose.Velocity.x, pose.Velocity.z).magnitude;
             float stride = Mathf.Clamp01(speed / 5f);
             _phase += dt * (4f + speed * 1.6f);
             float swing = Mathf.Sin(_phase) * 40f * stride;
-            _legLeft.localRotation = Quaternion.Euler(swing, 0f, 0f);
-            // A keeper stretching to block shoots a leg out to the side.
-            _legRight.localRotation = stretching ? Quaternion.Euler(-20f, 0f, 65f) : Quaternion.Euler(-swing, 0f, 0f);
-            _armLeft.localRotation = Quaternion.Euler(-swing * 0.8f, 0f, 0f);
-            _armRight.localRotation = Quaternion.Euler(swing * 0.8f, 0f, 0f);
+            float legL = swing, legR = -swing, armL = -swing * 0.8f, armR = swing * 0.8f;
+            float sideR = 0f;
 
-            float bob = Mathf.Abs(Mathf.Sin(_phase)) * 0.06f * stride;
+            if (_kickTime >= 0f)
+            {
+                // Strike, then follow through: the leg swings forward and back down.
+                _kickTime += dt;
+                float t = _kickTime / 0.35f;
+                float kick = t < 1f ? Mathf.Sin(t * Mathf.PI) * -75f * _kickStrength : 0f;
+                if (_kickLeft) legL = kick; else legR = kick;
+                if (t >= 1f) _kickTime = -1f;
+            }
+            if (pose.Stretching) { legR = -20f; sideR = 65f; }
+
+            if (_reactionTime >= 0f)
+            {
+                _reactionTime += dt;
+                float k = Mathf.Sin(Mathf.Clamp01(_reactionTime / 1.2f) * Mathf.PI);
+                switch (_reaction)
+                {
+                    case Reaction.HeadInHands: armL = armR = -150f * k; break;
+                    case Reaction.FistClench: armR = -120f * k; break;
+                }
+                if (_reactionTime > 1.2f) _reactionTime = -1f;
+            }
+
+            float hop = 0f;
+            if (_celebrationTime >= 0f)
+            {
+                _celebrationTime += dt;
+                armL = armR = -160f;
+                hop = Mathf.Abs(Mathf.Sin(_celebrationTime * 6f)) * 0.25f;
+                if (_celebrationTime > 2.4f) _celebrationTime = -1f;
+            }
+
+            _legLeft.localRotation = Quaternion.Euler(legL, 0f, 0f);
+            _legRight.localRotation = Quaternion.Euler(legR, 0f, sideR);
+            _armLeft.localRotation = Quaternion.Euler(armL, 0f, 0f);
+            _armRight.localRotation = Quaternion.Euler(armR, 0f, 0f);
+
+            float bob = Mathf.Abs(Mathf.Sin(_phase)) * 0.06f * stride + hop;
             _body.localPosition = new Vector3(0f, bob, 0f);
-            _body.localRotation = stunned ? Quaternion.Euler(25f, 0f, 0f) : Quaternion.Euler(8f * stride, 0f, 0f);
+            bool stumbling = pose.Stunned || (_reaction == Reaction.Stumble && _reactionTime >= 0f);
+            _body.localRotation = stumbling ? Quaternion.Euler(25f, 0f, 0f) : Quaternion.Euler(8f * stride, 0f, 0f);
 
-            _marker.SetActive(controlled);
+            _marker.SetActive(pose.Controlled);
         }
     }
 }
