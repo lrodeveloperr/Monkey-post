@@ -348,7 +348,8 @@ namespace MonkeyPost.Core
         {
             Ball.Body.Centre = clampedCentre;
             float speedIn = -Vec3.Dot(Ball.Body.Velocity, normal);
-            if (BallPhysics.Contact(ref Ball.Body, normal, Vec3.Zero, _surface.WallRestitution, Config.WallFriction, Config.BallRadius)
+            float restitution = BallPhysics.Restitution(Config, _surface.WallRestitution, speedIn);
+            if (BallPhysics.Contact(ref Ball.Body, normal, Vec3.Zero, restitution, Config.WallFriction, Config.BallRadius)
                 && speedIn > WallHitSoundSpeed)
             {
                 _events.Add(new MatchEvent(MatchEventType.WallHit));
@@ -588,12 +589,16 @@ namespace MonkeyPost.Core
         {
             if (p.Id == Ball.Owner || p.StunTime > 0f || p.KickCooldown > 0f || p.PendingKick != KickType.None) return false;
             if (Ball.Height > Config.ControlHeight) return false;
+            var relative = Ball.Body.Velocity - new Vec3(p.Velocity, 0f);
+            float relativeSpeed = relative.Length;
+            if (relativeSpeed > Config.ControlMaxSpeed) return false;
+
+            // Fast balls can only be killed close to the body.
             float reach = p.IsKeeper ? Config.KeeperControlReach : Config.ControlReach;
+            float fast = (relativeSpeed - Config.FullReachControlSpeed) / (Config.ControlMaxSpeed - Config.FullReachControlSpeed);
+            reach *= 1f - 0.5f * Clamp(fast, 0f, 1f);
             float distance = Vec2.Distance(p.Position, Ball.Position);
             if (distance > reach) return false;
-
-            var relative = Ball.Body.Velocity - new Vec3(p.Velocity, 0f);
-            if (relative.Length > Config.ControlMaxSpeed) return false;
 
             if (Ball.Owner >= 0)
             {

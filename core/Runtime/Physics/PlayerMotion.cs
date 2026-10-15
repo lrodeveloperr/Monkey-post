@@ -3,13 +3,20 @@ using System;
 namespace MonkeyPost.Core
 {
     /// <summary>
-    /// Footballer locomotion with momentum: acceleration and braking take time, turning circles
-    /// widen with speed, and a sharp change of direction at speed means planting and braking first.
-    /// Tuned to feel realistic but stay responsive on a touchscreen.
+    /// Footballer locomotion from sports-science data (see docs/PHYSICS.md):
+    /// <list type="bullet">
+    /// <item>Speeding up follows the mono-exponential sprint model: a = (vmax − v) / τ.</item>
+    /// <item>Braking is limited to a realistic maximum deceleration.</item>
+    /// <item>Speeding up, braking and turning share one grip budget (the friction circle), so
+    /// tight turns at speed are impossible: a sprinter curves on a radius of about v² / grip.</item>
+    /// <item>A sharp change of direction at speed means planting and braking first.</item>
+    /// </list>
+    /// Inputs act immediately (no artificial delay); the momentum is the physics.
     /// </summary>
     public static class PlayerMotion
     {
-        const float NearlyStill = 0.6f;
+        const float SwivelSpeed = 0.8f;
+        const float HardTurnAngle = 0.5f;
 
         /// <summary>Updates <paramref name="p"/>'s velocity and facing towards the desired movement.</summary>
         public static void Steer(PlayerState p, Vec2 move, bool wantsSprint, bool dribbling, MatchConfig c, float dt)
@@ -28,46 +35,49 @@ namespace MonkeyPost.Core
             float speed = p.Velocity.Length;
             var heading = speed > 1e-3f ? p.Velocity / speed : p.Facing;
 
-            if (desiredSpeed > 0.01f)
+            if (desiredSpeed < 0.01f)
             {
-                var desiredDirection = move.Normalized;
-                if (speed < NearlyStill)
-                {
-                    heading = desiredDirection;
-                }
-                else
-                {
-                    float angle = SignedAngle(heading, desiredDirection);
-                    if (Math.Abs(angle) > c.PlantTurnAngle && speed > c.JogSpeed * 0.6f)
-                    {
-                        // Too sharp to turn at this speed: plant and brake first.
-                        desiredSpeed = 0f;
-                    }
-                    else
-                    {
-                        float speedFraction = Math.Min(1f, speed / c.SprintSpeed);
-                        float maxTurn = (c.TurnRateStill + (c.TurnRateSprint - c.TurnRateStill) * speedFraction) * dt;
-                        float turn = Math.Max(-maxTurn, Math.Min(maxTurn, angle));
-                        heading = heading.Rotate(turn);
-                        // Turning hard scrubs a little speed.
-                        speed *= 1f - Math.Abs(turn) * 0.15f;
-                    }
-                }
+                speed = Math.Max(0f, speed - c.Deceleration * dt);
+                p.Velocity = heading * speed;
+                return;
             }
 
-            if (desiredSpeed > speed)
+            var direction = move.Normalized;
+            float angle = SignedAngle(heading, direction);
+
+            if (speed < SwivelSpeed)
             {
-                float acceleration = speed < c.JogSpeed ? c.Acceleration : c.SprintAcceleration;
-                speed = Math.Min(desiredSpeed, speed + acceleration * dt);
+                // Nearly still: swivel on the spot, then drive off.
+                float swivel = c.TurnRateStill * dt;
+                heading = heading.Rotate(Math.Max(-swivel, Math.Min(swivel, angle)));
+                speed = Math.Min(desiredSpeed, speed + Propulsion(c, speed) * dt);
+            }
+            else if (Math.Abs(angle) > c.PlantTurnAngle && speed > c.JogSpeed * 0.55f)
+            {
+                // Too sharp to turn at this speed: plant and brake first.
+                speed = Math.Max(0f, speed - c.Deceleration * dt);
             }
             else
             {
-                speed = Math.Max(desiredSpeed, speed - c.Deceleration * dt);
+                // Longitudinal acceleration first: don't accelerate while turning hard.
+                float along = desiredSpeed > speed
+                    ? Math.Min(Propulsion(c, speed), (desiredSpeed - speed) / dt)
+                    : -Math.Min(c.Deceleration, (speed - desiredSpeed) / dt);
+                if (Math.Abs(angle) > HardTurnAngle && along > 0f) along = 0f;
+
+                // Whatever grip is left turns the player: lateral acceleration = v · ω.
+                float lateral = (float)Math.Sqrt(Math.Max(0f, c.GripAcceleration * c.GripAcceleration - along * along));
+                float maxTurn = Math.Min(c.TurnRateStill, lateral / speed) * dt;
+                heading = heading.Rotate(Math.Max(-maxTurn, Math.Min(maxTurn, angle)));
+                speed = Math.Max(0f, speed + along * dt);
             }
 
             p.Velocity = heading * speed;
-            if (speed > 0.1f || desiredSpeed > 0.01f) p.Facing = heading;
+            p.Facing = heading;
         }
+
+        /// <summary>Forward acceleration available at a given speed (mono-exponential sprint model).</summary>
+        public static float Propulsion(MatchConfig c, float speed) => Math.Max(0f, (c.SprintSpeed - speed) / c.SprintTau);
 
         /// <summary>Slows a stunned or frozen player to a stop.</summary>
         public static void Brake(PlayerState p, MatchConfig c, float dt)

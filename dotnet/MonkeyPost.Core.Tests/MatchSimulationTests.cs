@@ -259,7 +259,8 @@ namespace MonkeyPost.Core.Tests
             inputs[1].Move = new Vec2(1f, 0f);
             inputs[2].Move = new Vec2(1f, 0f);
             inputs[2].Sprint = true;
-            for (int i = 0; i < 120; i++) Step(sim, inputs);
+            // Both accelerate identically up to jogging pace; the sprinter pulls away after that.
+            for (int i = 0; i < 180; i++) Step(sim, inputs);
 
             Assert.True(sim.Players[2].Position.X > sim.Players[1].Position.X + 1f);
             Assert.True(sim.Players[2].Stamina < sim.Players[1].Stamina);

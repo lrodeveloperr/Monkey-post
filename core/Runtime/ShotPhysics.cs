@@ -73,12 +73,31 @@ namespace MonkeyPost.Core
         {
             var offset = target - from;
             float distance = offset.Length;
-            float deceleration = c.SurfaceProfile.RollingDeceleration;
+            // Rolling deceleration is a + b·v: invert it numerically for the launch speed that
+            // arrives at the target at the chosen pace.
+            var surface = c.SurfaceProfile;
             float arrival = c.PassArrivalSpeed * firmness;
-            float speed = (float)Math.Sqrt(arrival * arrival + 2f * deceleration * distance);
+            float speed = LaunchSpeedForArrival(surface.RollingDeceleration, surface.RollingDragPerSpeed, distance, arrival);
             speed = Clamp(speed, c.PassMinSpeed, c.PassMaxSpeed);
             var velocity = offset.Normalized * speed;
             return new KickPlan { Velocity = new Vec3(velocity, 0f), Spin = BallPhysics.RollingSpin(velocity, c.BallRadius) };
+        }
+
+        /// <summary>Launch speed so a ball rolling with deceleration a + b·v covers <paramref name="distance"/> and arrives at <paramref name="arrival"/>.</summary>
+        static float LaunchSpeedForArrival(float a, float b, float distance, float arrival)
+        {
+            // Distance to slow from v0 to v1 under dv/dx = -(a + b v)/v:
+            // x = (v0 − v1)/b − (a/b²)·ln((a + b v0)/(a + b v1)).
+            if (b < 1e-4f) return (float)Math.Sqrt(arrival * arrival + 2f * a * distance);
+            double low = arrival, high = arrival + 60.0;
+            for (int i = 0; i < 40; i++)
+            {
+                double mid = (low + high) * 0.5;
+                double x = (mid - arrival) / b - a / (b * b) * Math.Log((a + b * mid) / (a + b * arrival));
+                if (x < distance) low = mid;
+                else high = mid;
+            }
+            return (float)((low + high) * 0.5);
         }
 
         /// <summary>

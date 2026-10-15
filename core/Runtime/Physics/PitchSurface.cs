@@ -5,7 +5,7 @@ namespace MonkeyPost.Core
     /// <summary>The six Nigerian pitches, each with its own ground.</summary>
     public enum PitchSurface
     {
-        /// <summary>Artificial turf: fast, true roll, medium bounce. The free starting pitch.</summary>
+        /// <summary>Artificial turf: true roll, medium bounce. The free starting pitch.</summary>
         LagosCage,
         /// <summary>Dusty earth: slow, bumpy, dead bounce.</summary>
         IbadanSchoolField,
@@ -19,22 +19,40 @@ namespace MonkeyPost.Core
         EnuguHillside,
     }
 
-    /// <summary>How a surface treats the ball.</summary>
+    /// <summary>
+    /// How a surface treats the ball. Calibrated against the FIFA Quality Programme test methods
+    /// (see docs/PHYSICS.md):
+    /// <list type="bullet">
+    /// <item>Vertical rebound: ball dropped from 2.0 m, rebound height of its underside.
+    /// FIFA turf: 0.60–0.85 m (Quality Pro). FIFA calibrates the ball to 1.35 m on concrete.</item>
+    /// <item>Reduced ball roll: ball released from a 1 m ramp, distance rolled.
+    /// FIFA turf: 4–8 m (Quality Pro), 4–10 m (Quality).</item>
+    /// </list>
+    /// </summary>
     public sealed class SurfaceProfile
     {
-        /// <summary>Fraction of vertical speed kept on a bounce.</summary>
+        /// <summary>Coefficient of restitution for a ground bounce at low impact speed (~6 m/s).</summary>
         public float Restitution;
 
-        /// <summary>Friction while the ball skids (before it settles into a roll), and during bounces.</summary>
+        /// <summary>Friction while the ball skids along the ground (before it settles into a roll).</summary>
         public float SlidingFriction;
 
-        /// <summary>Deceleration of a rolling ball, m/s².</summary>
+        /// <summary>
+        /// Friction available during a bounce. Footballs grip during oblique bounces (measured
+        /// friction-to-normal ratio about 1.0; Cross), so they usually leave rolling.
+        /// </summary>
+        public float BounceFriction;
+
+        /// <summary>Constant part of rolling deceleration, m/s².</summary>
         public float RollingDeceleration;
+
+        /// <summary>Speed-proportional part of rolling deceleration, 1/s (grass and infill drag).</summary>
+        public float RollingDragPerSpeed;
 
         /// <summary>0..1: random deviation in rolls and bounces from an uneven surface.</summary>
         public float Bumpiness;
 
-        /// <summary>Fraction of speed kept off the walls around this pitch.</summary>
+        /// <summary>Coefficient of restitution off the cage walls around this pitch, at low speed.</summary>
         public float WallRestitution;
 
         public static SurfaceProfile For(PitchSurface surface)
@@ -42,17 +60,23 @@ namespace MonkeyPost.Core
             switch (surface)
             {
                 case PitchSurface.LagosCage:
-                    return new SurfaceProfile { Restitution = 0.6f, SlidingFriction = 0.45f, RollingDeceleration = 1.2f, Bumpiness = 0f, WallRestitution = 0.65f };
+                    // FIFA-grade turf: rebound ~0.7 m, ramp roll ~6 m (mid FIFA Pro range). Concrete walls.
+                    return new SurfaceProfile { Restitution = 0.6f, SlidingFriction = 0.45f, BounceFriction = 0.9f, RollingDeceleration = 0.72f, RollingDragPerSpeed = 0.06f, Bumpiness = 0f, WallRestitution = 0.8f };
                 case PitchSurface.IbadanSchoolField:
-                    return new SurfaceProfile { Restitution = 0.5f, SlidingFriction = 0.55f, RollingDeceleration = 2.1f, Bumpiness = 0.35f, WallRestitution = 0.55f };
+                    // Dusty earth: dead and slow, below FIFA minimums (~3 m roll), bumpy.
+                    return new SurfaceProfile { Restitution = 0.5f, SlidingFriction = 0.55f, BounceFriction = 1f, RollingDeceleration = 1.5f, RollingDragPerSpeed = 0.12f, Bumpiness = 0.35f, WallRestitution = 0.75f };
                 case PitchSurface.AbujaEstateCourt:
-                    return new SurfaceProfile { Restitution = 0.72f, SlidingFriction = 0.5f, RollingDeceleration = 0.85f, Bumpiness = 0.05f, WallRestitution = 0.65f };
+                    // Asphalt: lively (rebound ~1.2 m) and quick (~11 m roll).
+                    return new SurfaceProfile { Restitution = 0.8f, SlidingFriction = 0.5f, BounceFriction = 0.8f, RollingDeceleration = 0.42f, RollingDragPerSpeed = 0.02f, Bumpiness = 0.05f, WallRestitution = 0.8f };
                 case PitchSurface.PortHarcourtWaterfront:
-                    return new SurfaceProfile { Restitution = 0.76f, SlidingFriction = 0.5f, RollingDeceleration = 0.7f, Bumpiness = 0.1f, WallRestitution = 0.7f };
+                    // Smooth concrete: FIFA's own ball calibration surface (1.35 m rebound), ~14 m roll.
+                    return new SurfaceProfile { Restitution = 0.86f, SlidingFriction = 0.5f, BounceFriction = 0.8f, RollingDeceleration = 0.33f, RollingDragPerSpeed = 0.02f, Bumpiness = 0.1f, WallRestitution = 0.8f };
                 case PitchSurface.KanoSandCourt:
-                    return new SurfaceProfile { Restitution = 0.3f, SlidingFriction = 0.7f, RollingDeceleration = 3.4f, Bumpiness = 0.25f, WallRestitution = 0.5f };
+                    // Sand: barely bounces (~0.2 m), dies within ~1.5 m.
+                    return new SurfaceProfile { Restitution = 0.3f, SlidingFriction = 0.7f, BounceFriction = 1f, RollingDeceleration = 2.6f, RollingDragPerSpeed = 0.45f, Bumpiness = 0.25f, WallRestitution = 0.7f };
                 case PitchSurface.EnuguHillside:
-                    return new SurfaceProfile { Restitution = 0.55f, SlidingFriction = 0.45f, RollingDeceleration = 1.6f, Bumpiness = 0.2f, WallRestitution = 0.6f };
+                    // Natural grass, slightly uneven: rebound ~0.65 m, ~5 m roll.
+                    return new SurfaceProfile { Restitution = 0.58f, SlidingFriction = 0.45f, BounceFriction = 0.9f, RollingDeceleration = 0.9f, RollingDragPerSpeed = 0.1f, Bumpiness = 0.2f, WallRestitution = 0.75f };
                 default:
                     throw new ArgumentOutOfRangeException(nameof(surface));
             }

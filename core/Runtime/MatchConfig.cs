@@ -33,21 +33,29 @@ namespace MonkeyPost.Core
         public float KickoffSeconds = 1f;
         public float GoalCelebrationSeconds = 2.5f;
 
-        // Player movement: realistic momentum, tuned to stay responsive on a phone.
-        public float JogSpeed = 5f;
-        public float SprintSpeed = 7f;
-        public float DribbleSpeedFactor = 0.92f;
-        public float Acceleration = 10f;
-        /// <summary>Acceleration above jogging speed (it takes longer to reach full sprint).</summary>
-        public float SprintAcceleration = 5f;
-        public float Deceleration = 14f;
-        /// <summary>Turn rate when nearly still, radians per second.</summary>
-        public float TurnRateStill = 14f;
-        /// <summary>Turn rate at full sprint: sprinting players take wide turns.</summary>
-        public float TurnRateSprint = 5f;
+        // Player movement, from sports-science sprint data (see docs/PHYSICS.md). Street
+        // footballers: a little below professionals' ~9.2–9.5 m/s top speed.
+        public float JogSpeed = 5.5f;
+        public float SprintSpeed = 8f;
+        public float DribbleSpeedFactor = 0.9f;
+        /// <summary>
+        /// Sprint time constant τ of the mono-exponential sprint model v(t) = vmax(1 − e^(−t/τ)):
+        /// the time to reach 63% of top speed. Initial acceleration is SprintSpeed / τ (≈7 m/s²).
+        /// </summary>
+        public float SprintTau = 1.15f;
+        /// <summary>Maximum braking deceleration, m/s².</summary>
+        public float Deceleration = 6.5f;
+        /// <summary>
+        /// Total horizontal acceleration the feet can put down (the friction circle), shared between
+        /// speeding up, braking and turning. ~0.8 g: curved sprints run on 7–11 m radii near top speed.
+        /// </summary>
+        public float GripAcceleration = 8f;
+        /// <summary>How fast a nearly-still player can swivel, radians per second.</summary>
+        public float TurnRateStill = 12f;
         /// <summary>Asked to turn further than this at speed, a player plants and brakes first.</summary>
-        public float PlantTurnAngle = 1.9f;
-        public float StaminaDrainPerSecond = 0.25f;
+        public float PlantTurnAngle = 1.75f;
+        /// <summary>A full stamina bar lasts ~6.5 s of flat-out sprinting (maximal sprint ability).</summary>
+        public float StaminaDrainPerSecond = 0.15f;
         public float StaminaRegenPerSecond = 0.15f;
 
         // Player bodies (vertical cylinders) for player contact and ball deflections.
@@ -63,20 +71,43 @@ namespace MonkeyPost.Core
         public float BallRadius = 0.11f;
         public float BallMass = 0.43f;
         public float AirDensity = 1.2f;
+        /// <summary>Drag coefficient below the drag crisis (laminar boundary layer).</summary>
         public float DragCoefficientSlow = 0.45f;
-        public float DragCoefficientFast = 0.22f;
-        public float DragCrisisStartSpeed = 9f;
-        public float DragCrisisEndSpeed = 15f;
-        public float LiftCoefficientMax = 0.35f;
+        /// <summary>Drag coefficient above the drag crisis (turbulent boundary layer).</summary>
+        public float DragCoefficientFast = 0.2f;
+        /// <summary>The drag crisis is centred near 12 m/s for a football (Re ≈ 1.7×10⁵).</summary>
+        public float DragCrisisStartSpeed = 10f;
+        public float DragCrisisEndSpeed = 14f;
+        /// <summary>Spin raises drag: ΔCd = SpinDragFactor × S, capped (S = rω/v, the spin parameter).</summary>
+        public float SpinDragFactor = 0.3f;
+        public float SpinDragMax = 0.12f;
+        /// <summary>
+        /// Lift (Magnus) coefficient fit: Cl = S / (LiftFitA·S + LiftFitB). Gives Cl ≈ 0.25 at the
+        /// S ≈ 0.22 of a typical curled free kick, saturating near 0.4 at high spin (Goff & Carré).
+        /// </summary>
+        public float LiftFitA = 2.32f;
+        public float LiftFitB = 0.4f;
         public float SpinDecaySeconds = 5f;
         public float Gravity = 9.81f;
         /// <summary>Landing slower than this, the ball settles instead of bouncing.</summary>
         public float BounceThreshold = 0.6f;
+        /// <summary>
+        /// Restitution falls as impact speed rises (the ball deforms more): each m/s above
+        /// RestitutionReferenceSpeed loses this fraction, down to RestitutionFloor.
+        /// </summary>
+        public float RestitutionSpeedLoss = 0.008f;
+        public float RestitutionReferenceSpeed = 6.3f;
+        public float RestitutionFloor = 0.6f;
         public float WallFriction = 0.4f;
 
         // Ball control. Feet only, so nobody plays the ball above roughly thigh height.
         public float ControlReach = 0.75f;
-        public float KeeperControlReach = 0.9f;
+        public float KeeperControlReach = 0.8f;
+        /// <summary>
+        /// Above this relative speed a player can't reach out for a clean touch: the reach for
+        /// control shrinks linearly to half at ControlMaxSpeed (wider balls must be blocked).
+        /// </summary>
+        public float FullReachControlSpeed = 8f;
         public float ControlHeight = 0.9f;
         /// <summary>Faster than this (relative to the player), the ball deflects off them instead.</summary>
         public float ControlMaxSpeed = 15f;
@@ -87,7 +118,7 @@ namespace MonkeyPost.Core
         // Dribbling: the ball really leaves the foot on each touch.
         public float TouchReach = 0.8f;
         public float DribbleLeadJog = 0.6f;
-        public float DribbleLeadSprint = 1.5f;
+        public float DribbleLeadSprint = 2.2f;
         public float TouchCooldownSeconds = 0.15f;
         /// <summary>0..1: how much the game helps keep the ball close (the touch assist).</summary>
         public float DribbleAssist = 1f;

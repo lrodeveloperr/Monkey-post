@@ -58,14 +58,18 @@ namespace MonkeyPost.Core
             {
                 float area = (float)Math.PI * r * r;
                 float pressurePerMass = 0.5f * c.AirDensity * area * speed * speed / c.BallMass;
-                acceleration += -(v / speed) * (pressurePerMass * DragCoefficient(c, speed));
-
                 float spinRate = b.Spin.Length;
+                float spinParameter = r * spinRate / speed;
+                acceleration += -(v / speed) * (pressurePerMass * DragCoefficient(c, speed, spinParameter));
+
                 if (spinRate > 0.01f)
                 {
-                    float spinParameter = r * spinRate / speed;
-                    float lift = Math.Min(c.LiftCoefficientMax, spinParameter);
-                    acceleration += Vec3.Cross(b.Spin, v).Normalized * (pressurePerMass * lift);
+                    // Magnus force acts along ω × v (only the spin component across the flight counts).
+                    var magnus = Vec3.Cross(b.Spin, v);
+                    float crossSpin = magnus.Length / speed;
+                    float effectiveS = r * crossSpin / speed;
+                    if (effectiveS > 1e-4f)
+                        acceleration += magnus.Normalized * (pressurePerMass * LiftCoefficient(c, effectiveS));
                 }
             }
 
@@ -82,7 +86,7 @@ namespace MonkeyPost.Core
                 return false;
             }
 
-            Contact(ref b, Vec3.Up, Vec3.Zero, s.Restitution, s.SlidingFriction, r);
+            Contact(ref b, Vec3.Up, Vec3.Zero, Restitution(c, s.Restitution, -b.Velocity.Z), s.BounceFriction, r);
             if (rng != null && s.Bumpiness > 0f)
             {
                 // Uneven ground knocks the bounce off line a little.
@@ -117,7 +121,8 @@ namespace MonkeyPost.Core
                 float speed = flat.Length;
                 if (speed > 0f)
                 {
-                    flat *= Math.Max(0f, speed - s.RollingDeceleration * h) / speed;
+                    float deceleration = s.RollingDeceleration + s.RollingDragPerSpeed * speed;
+                    flat *= Math.Max(0f, speed - deceleration * h) / speed;
                     if (rng != null && s.Bumpiness > 0f && speed > 0.5f)
                         flat += flat.Normalized.Perpendicular * (rng.Range(-1f, 1f) * s.Bumpiness * 3f * h);
                 }
@@ -158,13 +163,28 @@ namespace MonkeyPost.Core
             return true;
         }
 
-        /// <summary>Drag coefficient with the drag crisis: high at low speed, dropping for hard-hit balls.</summary>
-        public static float DragCoefficient(MatchConfig c, float speed)
+        /// <summary>
+        /// Drag coefficient with the drag crisis (high at low speed, dropping for hard-hit balls),
+        /// raised by spin.
+        /// </summary>
+        public static float DragCoefficient(MatchConfig c, float speed, float spinParameter = 0f)
         {
             float t = (speed - c.DragCrisisStartSpeed) / (c.DragCrisisEndSpeed - c.DragCrisisStartSpeed);
             t = Math.Max(0f, Math.Min(1f, t));
             t = t * t * (3f - 2f * t);
-            return c.DragCoefficientSlow + (c.DragCoefficientFast - c.DragCoefficientSlow) * t;
+            float cd = c.DragCoefficientSlow + (c.DragCoefficientFast - c.DragCoefficientSlow) * t;
+            return cd + Math.Min(c.SpinDragMax, c.SpinDragFactor * spinParameter);
+        }
+
+        /// <summary>Magnus lift coefficient for spin parameter S = rω/v (saturating fit to measured data).</summary>
+        public static float LiftCoefficient(MatchConfig c, float spinParameter) =>
+            spinParameter / (c.LiftFitA * spinParameter + c.LiftFitB);
+
+        /// <summary>Restitution at a given impact speed: balls bounce less when hit harder.</summary>
+        public static float Restitution(MatchConfig c, float lowSpeedRestitution, float impactSpeed)
+        {
+            float loss = c.RestitutionSpeedLoss * Math.Max(0f, impactSpeed - c.RestitutionReferenceSpeed);
+            return lowSpeedRestitution * Math.Max(c.RestitutionFloor, 1f - loss);
         }
 
         /// <summary>Spin that makes a ball moving at <paramref name="velocity"/> roll without slipping.</summary>

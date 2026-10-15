@@ -79,6 +79,10 @@ All numbers live in `MatchConfig` and will be tuned from playtests.
 dribbling with a touch assist**, **automatic curl and spin from how you strike it**, **each pitch
 surface plays differently**, and **realistic momentum tuned to stay responsive**.
 
+**Calibrated against real-world measurements** (FIFA turf and ball test methods, wind-tunnel and
+trajectory studies, sports-science sprint data). Every benchmark is enforced by a test. The full
+reference, with sources and measured results, is in [PHYSICS.md](PHYSICS.md).
+
 All of it lives in `core/` (pure C#, deterministic and unit-tested), not in Unity's physics engine.
 That keeps the host-runs-the-match model of local 1v1 exact on every phone. The match steps at
 **60 Hz** and the ball at **240 Hz**, so even a 26 m/s shot can't pass through a leg or a post.
@@ -119,20 +123,23 @@ That keeps the host-runs-the-match model of local 1v1 exact on every phone. The 
   further ahead**, so it's quicker but easier to nick. The **touch assist** gently steers the
   ball towards the ideal spot ahead of the carrier (adjustable in config).
 - **First touch:** balls up to about 6 m/s are killed cleanly; faster or bouncing balls can run
-  away. **Above 15 m/s the ball deflects off the player instead.**
+  away, and fast balls can only be killed close to the body. **Above 15 m/s the ball deflects off
+  the player instead.**
 - **Tackles:** timing matters. A ball between touches (away from the carrier's feet) is easier to
   win; a missed tackle leaves the tackler stunned.
 
 **Players** (`PlayerMotion`):
-- Acceleration and braking take time, **turning circles widen with speed**, and a sharp change of
-  direction at speed means **planting and braking first**.
+- The **sports-science sprint model**: initial acceleration about 7 m/s², top speed 8 m/s (street
+  level, below professionals' ~9.3), braking up to 6.5 m/s². A **friction-circle grip limit**
+  makes sprinters curve on realistic 7–11 m radii, and a sharp change of direction at speed means
+  **planting and braking first**. A stamina bar lasts about 6.5 s of flat-out sprinting.
 - Players have **bodies**: they shoulder each other with real momentum, and the ball deflects off
   them.
 - **The feet-only keeper** stretches a leg to block shots, comes off the line to narrow the angle,
   always takes the first touch away from goal, and clears firmly.
 - **Goal credit:** a shot that deflects in off a defender or keeper is the shooter's goal.
 
-**Verified by tests** (47 in total, including): drag shortens a lofted ball; sidespin curls the
+**Verified by tests** (62 in total, 15 of them real-world benchmarks; see PHYSICS.md), including: drag shortens a lofted ball; sidespin curls the
 correct way by 0.5–5 m; topspin lands short and backspin long; skid-to-roll keeps 3/5 speed;
 backspin checks up and topspin kicks on the bounce; concrete rolls and bounces furthest and sand
 least; planned curling shots arrive within 15 cm of aim; passes arrive at about 5 m/s; dribbled
@@ -185,10 +192,16 @@ dribbles round defenders, passes when pressed, and shoots when in range with an 
 
 A person's AI teammates always play at Medium.
 
-**Measured with bot-only matches** (30 matches each, run by the test suite):
+**Measured with bot-only matches** (30 matches each, run by the test suite, calibrated physics):
 
 | Match | Goals per 4-min match | Result |
 |---|---|---|
+| Easy v Easy | 2.2 | |
+| Medium v Medium | 2.5 | |
+| Hard v Hard | 3.0 | |
+| Hard v Easy | 3.6 | Hard won 20, drew 9, lost 1 |
+
+---|---|---|
 | Easy v Easy | 2.2 | |
 | Medium v Medium | 3.3 | |
 | Hard v Hard | 7.6 | |

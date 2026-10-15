@@ -226,7 +226,7 @@ namespace MonkeyPost.Core.Tests
         {
             var sim = InPlay();
             sim.PlacePlayer(4, new Vec2(24f, 10f), new Vec2(1f, 0f));
-            sim.PlaceBall(new Vec2(25.4f, 10f), Vec2.Zero);
+            sim.PlaceBall(new Vec2(25.2f, 10f), Vec2.Zero);
 
             bool shot = false;
             sim.Step(Inputs(x => { x[4].Shoot = true; x[4].Power = 0.5f; }), Dt);
@@ -316,11 +316,11 @@ namespace MonkeyPost.Core.Tests
             float topSpeed = sim.Players[2].Velocity.X;
             Assert.True(topSpeed > sim.Config.JogSpeed);
 
-            for (int i = 0; i < 6; i++) sim.Step(Inputs(x => x[2].Move = new Vec2(-1f, 0f)), Dt);
+            for (int i = 0; i < 15; i++) sim.Step(Inputs(x => x[2].Move = new Vec2(-1f, 0f)), Dt);
             // Still travelling the original way, but braking hard.
             Assert.True(sim.Players[2].Velocity.X > 0f && sim.Players[2].Velocity.X < topSpeed - 1f);
 
-            for (int i = 0; i < 60; i++) sim.Step(Inputs(x => x[2].Move = new Vec2(-1f, 0f)), Dt);
+            for (int i = 0; i < 150; i++) sim.Step(Inputs(x => x[2].Move = new Vec2(-1f, 0f)), Dt);
             Assert.True(sim.Players[2].Velocity.X < -2f);
         }
 
