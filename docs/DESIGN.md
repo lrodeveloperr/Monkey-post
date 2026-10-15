@@ -251,15 +251,23 @@ retired Play Games real-time multiplayer in 2020, and any replacement needs a se
 
 ## 6. Ads
 
+**Status: confirmed by owner (Part 6).**
+
 - **Non-personalised on every request.** Max ad content rating: **PG**.
+- **Interstitial:** on the full-time screen **after every 2nd match**, at most one every
+  3 minutes. Never at launch or mid-match (Play policy).
+- **New players:** no interstitials during their **first 3 matches**. Rewarded ads are still
+  offered.
+- **Rewarded:** optional, on the full-time screen: "Watch an ad to double your coins."
+  Everything can be earned by playing, so ads are never required.
+- **No banner ads** anywhere.
+- **Local 1v1:** no interstitials between rematches. One may show when a player leaves 1v1 and
+  goes back to the menu (subject to the rules above).
+- **Offline:** the game is fully playable without internet. If no ad can load, play simply
+  continues and the rewarded button is hidden.
 - **UMP consent form** for users in the EEA, UK and Switzerland, plus US state privacy messages.
   This is still required with non-personalised ads, because ads use device storage for frequency
   capping and fraud prevention. If consent is refused, Google serves limited ads.
-- **Interstitial:** only on the full-time screen, after every 2nd match, at most one every
-  3 minutes. Never at launch or mid-match (Play policy).
-- **Rewarded:** optional, player-initiated, on the full-time screen: "Watch an ad to double your
-  coins." Everything can be earned by playing, so ads are never required.
-- In local 1v1 each phone shows its own ads on its own full-time screen.
 - **app-ads.txt** must be hosted on the developer website listed on the store page. A free
   GitHub Pages site works and can also host the privacy policy.
 
