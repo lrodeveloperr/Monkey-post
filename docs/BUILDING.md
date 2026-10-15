@@ -1,7 +1,13 @@
 # Building and installing Monkey Post
 
-Every push builds an Android APK on GitHub Actions using the free **Unity Personal** licence.
-You don't need to install the Unity editor. There's a one-off licence setup first.
+Android APKs are built on GitHub Actions using the free **Unity Personal** licence. You don't
+need to install the Unity editor. There's a one-off licence setup first.
+
+**Cost: £0.** Unity Personal is free while the company's revenue and funding stay under Unity's
+threshold (currently $200,000 a year). GitHub gives private repositories 2,000 free Actions
+minutes a month; builds are **on demand only** (each takes about 20–60 minutes) so that allowance
+isn't used up. If it ever were, GitHub simply pauses builds until next month; with no payment
+method on the account, nothing can be charged.
 
 ## One-off: connect your Unity licence (about 10 minutes)
 
@@ -35,7 +41,8 @@ Until these exist, the "Android build" workflow skips the build with a warning i
 3. Copy the APK to the phone (or download it there), open it, and allow "install unknown apps"
    when Android asks. Installs from Play will replace this later.
 
-To build without waiting for a push: **Actions → Android build → Run workflow**.
+To build: **Actions → Android build → Run workflow** (or ask Claude to start one). Downloads are
+kept for 7 days.
 
 ## Playing the prototype
 

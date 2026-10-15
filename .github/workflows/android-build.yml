@@ -1,11 +1,8 @@
 name: Android build
 
+# On demand only (Actions tab -> Android build -> Run workflow), so a private repository stays
+# well inside GitHub's 2,000 free Actions minutes a month. Each build takes ~20-60 minutes.
 on:
-  push:
-    paths:
-      - "core/**"
-      - "unity/**"
-      - ".github/workflows/android-build.yml"
   workflow_dispatch:
 
 concurrency:
@@ -75,4 +72,4 @@ jobs:
         with:
           name: MonkeyPost-${{ github.run_number }}
           path: build/Android
-          retention-days: 14
+          retention-days: 7
