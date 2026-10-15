@@ -242,7 +242,7 @@ A Medium win with two goals pays (20 + 20 + 30) × 1.5 = 105 coins, so a common 
 | App name on Play | **Monkey Post: Street Football** |
 | Store listing language | English |
 | Support email (public on the store) | **info@worksbienstudios.com** |
-| Website | The company's existing website (assumed `worksbienstudios.com`, to confirm) |
+| Website | The company's existing website, `worksbienstudios.com` (confirmed) |
 | Privacy policy | A page on the company website, e.g. `worksbienstudios.com/monkeypost/privacy` |
 | AdMob | **Handled by Worksbien Studios**: AdMob account, app and ad unit IDs, payments, app-ads.txt on the company domain, and the consent (UMP) messages in AdMob's Privacy & messaging. The app only needs the IDs. |
 
@@ -481,10 +481,8 @@ Organisation accounts are currently exempt, but check this in Play Console at th
 
 ## 12. Open items for the owner
 
-All 12 decision areas are confirmed. Remaining practical items:
+All 12 decision areas are confirmed, and so are the website (`worksbienstudios.com`) and the
+company's D-U-N-S number.
 
-- Confirm the website domain (assumed `worksbienstudios.com`) for the privacy policy page.
-- Get a D-U-N-S number for Worksbien Studios Inc. (free) if the Play organisation account doesn't
-  have one yet.
 - AdMob (account, ad unit IDs, app-ads.txt, consent messages): handled by Worksbien Studios. Send
   the ad unit IDs when they exist; test IDs are used until then.
