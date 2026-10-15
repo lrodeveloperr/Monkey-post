@@ -162,7 +162,46 @@ namespace MonkeyPost.Core
         public float KeeperStretchReach = 0.75f;
         public float KeeperFootRadius = 0.25f;
 
+        // Skill moves.
+        public float SkillCooldownSeconds = 0.8f;
+        /// <summary>A skill move counts as a success if it beats the defender and keeps the ball within this long.</summary>
+        public float SkillJudgeSeconds = 2f;
+        /// <summary>Earliest moment a drag-back or step-over can be judged (it must actually shake the defender off).</summary>
+        public float SkillMinSeconds = 0.5f;
+        /// <summary>A nutmeg is a knock just past the defender, not a long ball.</summary>
+        public float NutmegSpeed = 4.5f;
+        /// <summary>A defender's legs are open (nutmeg-able) when moving faster than this, lunging or stretching.</summary>
+        public float LegsOpenSpeed = 2.5f;
+        /// <summary>Weight shift forced on a wrong-footed defender by a step-over, m/s.</summary>
+        public float StepOverShove = 2.2f;
+        public float SkillRange = 2.5f;
+
+        // Shielding (automatic).
+        public float ShieldRange = 1.6f;
+        public float ShieldMaxSpeed = 3f;
+        /// <summary>Tackles from the far side of a shielding carrier succeed this much less often.</summary>
+        public float ShieldTackleFactor = 0.45f;
+
+        // Through balls.
+        public float ThroughBallMinLead = 3f;
+        public float ThroughBallMaxLead = 7f;
+
+        /// <summary>Per-team physical edges (opponent strength). Defaults are 1 (no edge).</summary>
+        public TeamTraits HomeTraits = new TeamTraits();
+        public TeamTraits AwayTraits = new TeamTraits();
+
+        public TeamTraits Traits(int team) => team == 0 ? HomeTraits : AwayTraits;
+
         public SurfaceProfile SurfaceProfile => SurfaceProfile.For(Surface);
+
+        /// <summary>A copy, so a match can adjust traits without touching the caller's config.</summary>
+        public MatchConfig Clone()
+        {
+            var copy = (MatchConfig)MemberwiseClone();
+            copy.HomeTraits = HomeTraits.Clone();
+            copy.AwayTraits = AwayTraits.Clone();
+            return copy;
+        }
 
         public void Validate()
         {
@@ -179,5 +218,22 @@ namespace MonkeyPost.Core
             if (BallRadius <= 0f || BallMass <= 0f)
                 throw new ArgumentException("Ball radius and mass must be positive.");
         }
+    }
+
+    /// <summary>
+    /// Small physical edges that make stronger teams stronger: a few percent of pace, tackling and
+    /// touch. 1 means no edge. Never applied to a person's own team (no stats, no pay-to-win).
+    /// </summary>
+    [Serializable]
+    public sealed class TeamTraits
+    {
+        /// <summary>Multiplies jogging and sprinting speed.</summary>
+        public float Pace = 1f;
+        /// <summary>Multiplies tackle success.</summary>
+        public float Tackling = 1f;
+        /// <summary>Divides first-touch and dribble-touch errors.</summary>
+        public float Touch = 1f;
+
+        public TeamTraits Clone() => (TeamTraits)MemberwiseClone();
     }
 }

@@ -27,9 +27,14 @@ namespace MonkeyPost.Core
 
         /// <param name="home">Bot difficulty for the home team, or null if a person plays it.</param>
         /// <param name="away">Bot difficulty for the away team, or null if a person plays it.</param>
-        public LocalMatch(MatchConfig config, BotDifficulty? home, BotDifficulty? away, ulong seed)
+        /// <param name="cupRound">Street-cup round (0 = quarter-final): computer teams get slightly stronger each round.</param>
+        public LocalMatch(MatchConfig config, BotDifficulty? home, BotDifficulty? away, ulong seed, int cupRound = 0)
         {
             if (config == null) throw new ArgumentNullException(nameof(config));
+            // Computer teams get their physical edges; a person's team never has any.
+            config = config.Clone();
+            config.HomeTraits = home.HasValue ? BotProfile.TraitsFor(home.Value, cupRound) : new TeamTraits();
+            config.AwayTraits = away.HasValue ? BotProfile.TraitsFor(away.Value, cupRound) : new TeamTraits();
             var rng = new DeterministicRandom(seed);
             Simulation = new MatchSimulation(config, rng.NextULong(), rng.Next(2));
 

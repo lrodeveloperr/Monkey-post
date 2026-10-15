@@ -157,6 +157,10 @@ namespace MonkeyPost.Game
                 GuiKit.Label(new Rect(0, Screen.height * 0.3f, w, 0.2f * u), ours ? "GOAL!" : "THEY SCORE", 2.4f,
                     ours ? new Color(1f, 0.85f, 0.1f) : new Color(1f, 0.4f, 0.3f));
             }
+            else if (_presenter.SkillBannerTime > 0f && _presenter.SkillBanner != null)
+            {
+                GuiKit.Label(new Rect(0, Screen.height * 0.22f, w, 0.12f * u), _presenter.SkillBanner, 1.5f, new Color(0.4f, 1f, 0.5f));
+            }
             else if (sim.Phase == Phase.Kickoff)
             {
                 GuiKit.Label(new Rect(0, Screen.height * 0.3f, w, 0.12f * u), "KICK-OFF", 1.3f);

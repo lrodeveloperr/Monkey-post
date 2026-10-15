@@ -33,6 +33,26 @@ namespace MonkeyPost.Core
 
         /// <summary>Ask to control a different teammate. Handled by the controller, not the rules.</summary>
         public bool Switch;
+
+        /// <summary>With <see cref="Pass"/>: play it into space ahead of a running teammate.</summary>
+        public bool ThroughBall;
+
+        /// <summary>
+        /// A skill-move swipe, in pitch directions (zero for none). Relative to the way the carrier
+        /// is dribbling: forward = nutmeg, back = drag-back, sideways = step-over to that side.
+        /// </summary>
+        public Vec2 Skill;
+    }
+
+    public enum SkillMove
+    {
+        None,
+        /// <summary>Knock the ball through the defender's legs and run round him.</summary>
+        Nutmeg,
+        /// <summary>Roll the ball back under the sole and turn away.</summary>
+        DragBack,
+        /// <summary>Fake one way, go the other.</summary>
+        StepOver,
     }
 
     public enum KickType
@@ -58,6 +78,10 @@ namespace MonkeyPost.Core
         WallHit,
         /// <summary>Full time with the scores level in a cup tie: next goal wins.</summary>
         GoldenGoal,
+        /// <summary>A skill move was attempted (Detail = <see cref="SkillMove"/>).</summary>
+        SkillAttempt,
+        /// <summary>A skill move beat its defender (PlayerA beat PlayerB; Detail = <see cref="SkillMove"/>).</summary>
+        SkillBeat,
         MatchEnded,
     }
 
@@ -70,16 +94,19 @@ namespace MonkeyPost.Core
         public readonly int PlayerB;
         /// <summary>The team involved (kicking off, scoring), or -1.</summary>
         public readonly int Team;
+        /// <summary>Extra detail: the <see cref="SkillMove"/> for skill events; 1 for a through ball on Pass.</summary>
+        public readonly int Detail;
 
-        public MatchEvent(MatchEventType type, int playerA = -1, int playerB = -1, int team = -1)
+        public MatchEvent(MatchEventType type, int playerA = -1, int playerB = -1, int team = -1, int detail = 0)
         {
             Type = type;
             PlayerA = playerA;
             PlayerB = playerB;
             Team = team;
+            Detail = detail;
         }
 
-        public override string ToString() => $"{Type}(a={PlayerA}, b={PlayerB}, team={Team})";
+        public override string ToString() => $"{Type}(a={PlayerA}, b={PlayerB}, team={Team}, detail={Detail})";
     }
 
     public sealed class PlayerState
@@ -103,6 +130,7 @@ namespace MonkeyPost.Core
 
         // A pass or shot waiting for the ball to come into reach.
         public KickType PendingKick;
+        public bool PendingThrough;
         public float PendingAim;
         public float PendingPower;
         public Vec2 PendingDirection;
@@ -111,6 +139,23 @@ namespace MonkeyPost.Core
         // Keeper leg stretch.
         public float StretchTime;
         public Vec2 StretchDirection;
+
+        // Skill moves.
+        public float SkillCooldown;
+        public SkillMove ActiveSkill;
+        public int SkillDefender = -1;
+        public float SkillTime;
+        public bool SkillPassedDefender;
+        /// <summary>After a step-over: the next touches go this way, for this long.</summary>
+        public Vec2 FeintDirection;
+        public float FeintTime;
+
+        /// <summary>Holding off a close defender with the body (automatic for a slow carrier).</summary>
+        public bool IsShielding;
+
+        /// <summary>After a nutmeg: slipping round this defender (no body collision with them) for a moment.</summary>
+        public int SlipPast = -1;
+        public float SlipTime;
 
         public bool IsKeeper => Slot == 0;
     }
@@ -123,6 +168,14 @@ namespace MonkeyPost.Core
 
         /// <summary>The player dribbling the ball, or -1 when it is loose.</summary>
         public int Owner = -1;
+
+        /// <summary>Who the last pass was meant for (-1 if none), and where it was aimed.</summary>
+        public int IntendedReceiver = -1;
+        public Vec2 IntendedTarget;
+
+        /// <summary>A nutmeg in progress: the ball passes through this defender's legs untouched.</summary>
+        public int GhostPlayer = -1;
+        public float GhostTime;
 
         public Vec2 Position => Body.Centre.XY;
         public Vec2 Velocity => Body.Velocity.XY;

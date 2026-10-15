@@ -83,6 +83,60 @@ namespace MonkeyPost.Core
             return new KickPlan { Velocity = new Vec3(velocity, 0f), Spin = BallPhysics.RollingSpin(velocity, c.BallRadius) };
         }
 
+        /// <summary>
+        /// Plans a ground pass that reaches <paramref name="target"/> after about
+        /// <paramref name="seconds"/> (for through balls timed to meet a runner), never arriving
+        /// slower than <paramref name="minArrival"/>. Returns the plan and the actual travel time.
+        /// </summary>
+        public static KickPlan PlanTimedPass(MatchConfig c, Vec2 from, Vec2 target, float seconds, float minArrival, out float travelTime)
+        {
+            var surface = c.SurfaceProfile;
+            float a = surface.RollingDeceleration, b = surface.RollingDragPerSpeed;
+            float distance = Vec2.Distance(from, target);
+            float slowest = Math.Max(c.PassMinSpeed, LaunchSpeedForArrival(a, b, distance, minArrival));
+            float speed;
+            if (TravelTime(a, b, slowest, distance) <= seconds) speed = slowest;
+            else if (TravelTime(a, b, c.PassMaxSpeed, distance) >= seconds) speed = c.PassMaxSpeed;
+            else
+            {
+                float low = slowest, high = c.PassMaxSpeed;
+                for (int i = 0; i < 30; i++)
+                {
+                    float mid = (low + high) * 0.5f;
+                    if (TravelTime(a, b, mid, distance) > seconds) low = mid;
+                    else high = mid;
+                }
+                speed = (low + high) * 0.5f;
+            }
+            travelTime = TravelTime(a, b, speed, distance);
+            var velocity = (target - from).Normalized * speed;
+            return new KickPlan { Velocity = new Vec3(velocity, 0f), Spin = BallPhysics.RollingSpin(velocity, c.BallRadius) };
+        }
+
+        /// <summary>Time for a ball rolling with deceleration a + b·v from <paramref name="v0"/> to cover <paramref name="distance"/> (infinite if it stops short).</summary>
+        static float TravelTime(float a, float b, float v0, float distance)
+        {
+            // Find the speed v1 on arrival, then t = (1/b)·ln((a + b v0)/(a + b v1)).
+            if (Distance(a, b, v0, 0f) < distance) return float.PositiveInfinity;
+            double low = 0.0, high = v0;
+            for (int i = 0; i < 40; i++)
+            {
+                double mid = (low + high) * 0.5;
+                if (Distance(a, b, v0, (float)mid) > distance) low = mid;
+                else high = mid;
+            }
+            double v1 = (low + high) * 0.5;
+            if (b < 1e-4f) return (float)((v0 - v1) / a);
+            return (float)(Math.Log((a + b * v0) / (a + b * v1)) / b);
+        }
+
+        /// <summary>Distance rolled while slowing from v0 to v1 under deceleration a + b·v.</summary>
+        static float Distance(float a, float b, float v0, float v1)
+        {
+            if (b < 1e-4f) return (v0 * v0 - v1 * v1) / (2f * a);
+            return (float)((v0 - v1) / b - a / (b * b) * Math.Log((a + b * v0) / (a + b * v1)));
+        }
+
         /// <summary>Launch speed so a ball rolling with deceleration a + b·v covers <paramref name="distance"/> and arrives at <paramref name="arrival"/>.</summary>
         static float LaunchSpeedForArrival(float a, float b, float distance, float arrival)
         {

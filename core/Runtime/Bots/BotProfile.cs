@@ -37,6 +37,9 @@ namespace MonkeyPost.Core.Bots
         /// <summary>Seconds of ball movement the keeper anticipates when positioning.</summary>
         public float KeeperAnticipation;
 
+        /// <summary>Chance per decision to try a skill move on a close defender.</summary>
+        public float SkillChance;
+
         public static BotProfile For(BotDifficulty difficulty)
         {
             switch (difficulty)
@@ -52,6 +55,7 @@ namespace MonkeyPost.Core.Bots
                         PowerError = 0.2f,
                         PassVision = 0.3f,
                         KeeperAnticipation = 0f,
+                        SkillChance = 0.03f,
                     };
                 case BotDifficulty.Medium:
                     return new BotProfile
@@ -64,6 +68,7 @@ namespace MonkeyPost.Core.Bots
                         PowerError = 0.08f,
                         PassVision = 0.6f,
                         KeeperAnticipation = 0.15f,
+                        SkillChance = 0.12f,
                     };
                 case BotDifficulty.Hard:
                     return new BotProfile
@@ -76,10 +81,33 @@ namespace MonkeyPost.Core.Bots
                         PowerError = 0.04f,
                         PassVision = 0.9f,
                         KeeperAnticipation = 0.3f,
+                        SkillChance = 0.25f,
                     };
                 default:
                     throw new ArgumentOutOfRangeException(nameof(difficulty));
             }
+        }
+
+        /// <summary>
+        /// Physical edges for a computer team: stronger teams are a few percent quicker, sharper in
+        /// the tackle and cleaner on the ball, and each street-cup round adds a little more.
+        /// </summary>
+        public static TeamTraits TraitsFor(BotDifficulty difficulty, int cupRound = 0)
+        {
+            float pace, tackling, touch;
+            switch (difficulty)
+            {
+                case BotDifficulty.Easy: pace = 0.97f; tackling = 0.9f; touch = 0.9f; break;
+                case BotDifficulty.Medium: pace = 1f; tackling = 1f; touch = 1f; break;
+                case BotDifficulty.Hard: pace = 1.03f; tackling = 1.1f; touch = 1.1f; break;
+                default: throw new ArgumentOutOfRangeException(nameof(difficulty));
+            }
+            return new TeamTraits
+            {
+                Pace = pace + 0.005f * cupRound,
+                Tackling = tackling + 0.02f * cupRound,
+                Touch = touch + 0.02f * cupRound,
+            };
         }
     }
 }

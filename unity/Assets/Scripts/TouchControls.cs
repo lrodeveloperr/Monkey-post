@@ -5,13 +5,19 @@ namespace MonkeyPost.Game
 {
     /// <summary>
     /// Virtual joystick (left thumb) and three buttons (right thumb), context-sensitive:
-    /// A = Pass / Switch, B = Shoot (hold to charge) / Tackle, plus Sprint.
-    /// Keyboard works too, for testing in the editor: WASD/arrows, Shift, Space (A), K (B).
+    /// A = Pass / Switch (double-tap for a through ball), B = Shoot (hold to charge) / Tackle,
+    /// plus Sprint. Swipe anywhere else on the right half for skill moves: forward = nutmeg,
+    /// back = drag-back, sideways = step-over.
+    /// Keyboard works too, for testing in the editor: WASD/arrows, Shift, Space (A, double-tap for
+    /// a through ball), K (B), and 1/2/3/4 for nutmeg / drag-back / step-over left / right.
     /// </summary>
     sealed class TouchControls
     {
         const float ChargeSeconds = 1.1f;
         const int MouseId = -100;
+        /// <summary>A pass waits this long for a second tap (through ball) before it's played.</summary>
+        const float DoubleTapSeconds = 0.18f;
+        const float SwipeMaxSeconds = 0.4f;
 
         int _joyId = int.MinValue;
         Vector2 _joyOrigin, _joyPosition;
@@ -20,6 +26,11 @@ namespace MonkeyPost.Game
         bool _keyboardCharging;
 
         bool _aPressed, _tacklePressed, _shootReleased;
+        float _passWaiting = -1f;
+        int _swipeId = int.MinValue;
+        Vector2 _swipeStart;
+        float _swipeStartTime;
+        Vector2 _swipe;
 
         public float Charge { get; private set; }
         public bool Charging => _shootId != int.MinValue || _keyboardCharging;
@@ -36,8 +47,9 @@ namespace MonkeyPost.Game
 
         public void Reset()
         {
-            _joyId = _shootId = _sprintId = int.MinValue;
+            _joyId = _shootId = _sprintId = _swipeId = int.MinValue;
             _keyboardCharging = false;
+            _passWaiting = -1f;
             Charge = 0f;
         }
 
@@ -45,6 +57,7 @@ namespace MonkeyPost.Game
         public PlayerInput Read(bool hasBall, float dt)
         {
             _aPressed = _tacklePressed = _shootReleased = false;
+            _swipe = Vector2.zero;
 
             for (int i = 0; i < Input.touchCount; i++)
             {
@@ -79,12 +92,38 @@ namespace MonkeyPost.Game
 
             if (Charging) Charge = Mathf.Min(1f, Charge + dt / ChargeSeconds);
 
+            // Skill keys (editor): relative to the joystick, or straight up the pitch.
+            var heading = move.sqrMagnitude > 0.01f ? move.normalized : Vector2.right;
+            if (Input.GetKeyDown(KeyCode.Alpha1)) _swipe = heading;
+            if (Input.GetKeyDown(KeyCode.Alpha2)) _swipe = -heading;
+            if (Input.GetKeyDown(KeyCode.Alpha3)) _swipe = new Vector2(-heading.y, heading.x);
+            if (Input.GetKeyDown(KeyCode.Alpha4)) _swipe = new Vector2(heading.y, -heading.x);
+
+            // A tap on PASS waits briefly for a second tap: double-tap = through ball.
+            bool pass = false, through = false;
+            if (_aPressed && hasBall)
+            {
+                if (_passWaiting >= 0f)
+                {
+                    through = true;
+                    _passWaiting = -1f;
+                }
+                else _passWaiting = DoubleTapSeconds;
+            }
+            if (_passWaiting >= 0f)
+            {
+                _passWaiting -= dt;
+                if (_passWaiting < 0f) pass = true;
+            }
+
             var input = new PlayerInput
             {
                 Move = new Vec2(move.x, move.y),
                 Sprint = sprint,
-                Pass = _aPressed && hasBall,
+                Pass = pass || through,
+                ThroughBall = through,
                 Switch = _aPressed && !hasBall,
+                Skill = new Vec2(_swipe.x, _swipe.y),
                 Tackle = _tacklePressed && !hasBall,
                 Shoot = _shootReleased && hasBall,
                 Power = Charge,
@@ -116,6 +155,12 @@ namespace MonkeyPost.Game
                         _joyId = id;
                         _joyOrigin = _joyPosition = position;
                     }
+                    else if (position.x >= Screen.width * 0.5f && _swipeId == int.MinValue)
+                    {
+                        _swipeId = id;
+                        _swipeStart = position;
+                        _swipeStartTime = Time.unscaledTime;
+                    }
                     break;
 
                 case TouchPhase.Moved:
@@ -127,6 +172,14 @@ namespace MonkeyPost.Game
                 case TouchPhase.Canceled:
                     if (id == _joyId) _joyId = int.MinValue;
                     if (id == _sprintId) _sprintId = int.MinValue;
+                    if (id == _swipeId)
+                    {
+                        _swipeId = int.MinValue;
+                        var flick = position - _swipeStart;
+                        // Screen right/up map to pitch +X/+Y, like the joystick.
+                        if (flick.magnitude > 0.08f * U && Time.unscaledTime - _swipeStartTime < SwipeMaxSeconds)
+                            _swipe = flick.normalized;
+                    }
                     if (id == _shootId)
                     {
                         _shootId = int.MinValue;
@@ -169,6 +222,12 @@ namespace MonkeyPost.Game
                 new Color(0.3f, 0.9f, 0.4f, _sprintId != int.MinValue ? 0.75f : 0.45f));
 
             if (Charging) DrawPowerBar(safePower);
+
+            if (hasBall)
+            {
+                var hint = new Rect(Screen.width * 0.55f, Screen.height * 0.32f, Screen.width * 0.4f, 0.06f * U);
+                GuiKit.Label(hint, "SWIPE HERE: SKILLS", 0.45f, new Color(1f, 1f, 1f, 0.35f));
+            }
         }
 
         static void DrawButton(Vector2 centre, float radius, string label, Color colour)

@@ -47,6 +47,10 @@ namespace MonkeyPost.Game
         public string OpponentName { get; private set; } = "";
         public float GoalBanner { get; private set; }
         public int LastGoalTeam { get; private set; } = -1;
+
+        /// <summary>Text and time left for a skill-move banner ("NUTMEG!"), or null.</summary>
+        public string SkillBanner { get; private set; }
+        public float SkillBannerTime { get; private set; }
         public bool Finished => _match != null && _match.Simulation.Phase == Phase.Ended;
 
         public MatchPresenter(MatchConfig config, Transform parent)
@@ -117,6 +121,8 @@ namespace MonkeyPost.Game
             _pending.Sprint = input.Sprint;
             _pending.Aim = input.Aim;
             if (input.Pass) _pending.Pass = true;
+            if (input.ThroughBall) _pending.ThroughBall = true;
+            if (input.Skill.LengthSquared > 0.01f) _pending.Skill = input.Skill;
             if (input.Switch) _pending.Switch = true;
             if (input.Tackle) _pending.Tackle = true;
             if (input.Shoot)
@@ -133,14 +139,25 @@ namespace MonkeyPost.Game
                 Capture();
                 foreach (var e in _match.Simulation.Events)
                 {
-                    if (e.Type != MatchEventType.Goal) continue;
-                    GoalBanner = GoalBannerSeconds;
-                    LastGoalTeam = e.Team;
+                    if (e.Type == MatchEventType.Goal)
+                    {
+                        GoalBanner = GoalBannerSeconds;
+                        LastGoalTeam = e.Team;
+                    }
+                    else if (e.Type == MatchEventType.SkillBeat)
+                    {
+                        bool ours = e.Team == HumanTeam;
+                        bool nutmeg = e.Detail == (int)SkillMove.Nutmeg;
+                        SkillBanner = ours ? (nutmeg ? "NUTMEG!" : "SKILL!") : (nutmeg ? "NUTMEGGED!" : null);
+                        SkillBannerTime = SkillBanner != null ? 1.3f : 0f;
+                    }
                 }
-                _pending.Pass = _pending.Switch = _pending.Tackle = _pending.Shoot = false;
+                _pending.Pass = _pending.Switch = _pending.Tackle = _pending.Shoot = _pending.ThroughBall = false;
+                _pending.Skill = Vec2.Zero;
                 _accumulator -= TickSeconds;
             }
             GoalBanner = Mathf.Max(0f, GoalBanner - dt);
+            SkillBannerTime = Mathf.Max(0f, SkillBannerTime - dt);
         }
 
         void Capture()

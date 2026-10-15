@@ -13,6 +13,8 @@ namespace MonkeyPost.Core
         public readonly float Stamina;
         public readonly bool IsSprinting;
         public readonly bool IsStunned;
+        public readonly bool IsShielding;
+        public readonly bool IsStretching;
 
         public PlayerSnapshot(PlayerState p)
         {
@@ -25,6 +27,8 @@ namespace MonkeyPost.Core
             Stamina = p.Stamina;
             IsSprinting = p.IsSprinting;
             IsStunned = p.StunTime > 0f;
+            IsShielding = p.IsShielding;
+            IsStretching = p.StretchTime > 0f;
         }
 
         public bool IsKeeper => Slot == 0;
@@ -38,6 +42,8 @@ namespace MonkeyPost.Core
         public readonly float VerticalVelocity;
         public readonly Vec3 Spin;
         public readonly int Owner;
+        public readonly int IntendedReceiver;
+        public readonly Vec2 IntendedTarget;
 
         public BallSnapshot(BallState b)
         {
@@ -47,6 +53,8 @@ namespace MonkeyPost.Core
             VerticalVelocity = b.VerticalVelocity;
             Spin = b.Spin;
             Owner = b.Owner;
+            IntendedReceiver = b.IntendedReceiver;
+            IntendedTarget = b.IntendedTarget;
         }
     }
 

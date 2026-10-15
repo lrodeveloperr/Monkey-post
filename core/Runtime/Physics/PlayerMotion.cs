@@ -19,11 +19,13 @@ namespace MonkeyPost.Core
         const float HardTurnAngle = 0.5f;
 
         /// <summary>Updates <paramref name="p"/>'s velocity and facing towards the desired movement.</summary>
-        public static void Steer(PlayerState p, Vec2 move, bool wantsSprint, bool dribbling, MatchConfig c, float dt)
+        /// <param name="pace">Team pace edge (1 = none): scales jogging and sprinting speed.</param>
+        public static void Steer(PlayerState p, Vec2 move, bool wantsSprint, bool dribbling, MatchConfig c, float dt, float pace = 1f)
         {
             move = move.ClampLength(1f);
             bool sprinting = wantsSprint && p.Stamina > 0f && move.LengthSquared > 0.01f;
-            float topSpeed = sprinting ? c.SprintSpeed : c.JogSpeed;
+            float sprintSpeed = c.SprintSpeed * pace;
+            float topSpeed = sprinting ? sprintSpeed : c.JogSpeed * pace;
             if (dribbling) topSpeed *= c.DribbleSpeedFactor;
             float desiredSpeed = move.Length * topSpeed;
 
@@ -50,7 +52,7 @@ namespace MonkeyPost.Core
                 // Nearly still: swivel on the spot, then drive off.
                 float swivel = c.TurnRateStill * dt;
                 heading = heading.Rotate(Math.Max(-swivel, Math.Min(swivel, angle)));
-                speed = Math.Min(desiredSpeed, speed + Propulsion(c, speed) * dt);
+                speed = Math.Min(desiredSpeed, speed + Propulsion(c, speed, sprintSpeed) * dt);
             }
             else if (Math.Abs(angle) > c.PlantTurnAngle && speed > c.JogSpeed * 0.55f)
             {
@@ -61,7 +63,7 @@ namespace MonkeyPost.Core
             {
                 // Longitudinal acceleration first: don't accelerate while turning hard.
                 float along = desiredSpeed > speed
-                    ? Math.Min(Propulsion(c, speed), (desiredSpeed - speed) / dt)
+                    ? Math.Min(Propulsion(c, speed, sprintSpeed), (desiredSpeed - speed) / dt)
                     : -Math.Min(c.Deceleration, (speed - desiredSpeed) / dt);
                 if (Math.Abs(angle) > HardTurnAngle && along > 0f) along = 0f;
 
@@ -77,7 +79,7 @@ namespace MonkeyPost.Core
         }
 
         /// <summary>Forward acceleration available at a given speed (mono-exponential sprint model).</summary>
-        public static float Propulsion(MatchConfig c, float speed) => Math.Max(0f, (c.SprintSpeed - speed) / c.SprintTau);
+        public static float Propulsion(MatchConfig c, float speed, float sprintSpeed) => Math.Max(0f, (sprintSpeed - speed) / c.SprintTau);
 
         /// <summary>Slows a stunned or frozen player to a stop.</summary>
         public static void Brake(PlayerState p, MatchConfig c, float dt)

@@ -41,14 +41,18 @@ To build without waiting for a push: **Actions → Android build → Run workflo
 
 - **Left thumb:** drag anywhere on the left half to move.
 - **SPRINT:** hold.
-- **PASS / SWITCH:** with the ball, passes in the joystick direction; without it, switches player.
+- **PASS / SWITCH:** with the ball, passes in the joystick direction (double-tap for a through
+  ball into space); without it, switches player.
+- **Skill moves:** while dribbling, swipe on the right half (away from the buttons): forward =
+  nutmeg, back = drag-back, sideways = step-over.
 - **SHOOT / TACKLE:** with the ball, hold to charge and let go to shoot. Keep the bar in the
   **green**: red means it flies over knee height. Push the joystick up or down to aim at the
   far or near post. Without the ball, tap to tackle.
 - **II:** pause.
 
-In the Unity editor (optional): WASD/arrows to move, Shift to sprint, Space for pass/switch,
-K for shoot/tackle.
+In the Unity editor (optional): WASD/arrows to move, Shift to sprint, Space for pass/switch
+(double-tap for a through ball), K for shoot/tackle, 1/2/3/4 for nutmeg / drag-back / step-over
+left / right.
 
 ## Running the rules tests
 

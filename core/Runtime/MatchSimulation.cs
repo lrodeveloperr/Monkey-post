@@ -158,10 +158,26 @@ namespace MonkeyPost.Core
                 p.TouchCooldown = Math.Max(0f, p.TouchCooldown - dt);
                 p.StretchTime = Math.Max(0f, p.StretchTime - dt);
                 p.PendingTime = Math.Max(0f, p.PendingTime - dt);
-                if (p.PendingTime <= 0f) p.PendingKick = KickType.None;
+                if (p.PendingTime <= 0f)
+                {
+                    p.PendingKick = KickType.None;
+                    p.PendingThrough = false;
+                }
+                p.SkillCooldown = Math.Max(0f, p.SkillCooldown - dt);
+                p.FeintTime = Math.Max(0f, p.FeintTime - dt);
+                p.SlipTime = Math.Max(0f, p.SlipTime - dt);
+                if (p.SlipTime <= 0f) p.SlipPast = -1;
+                if (p.ActiveSkill != SkillMove.None)
+                {
+                    p.SkillTime -= dt;
+                    JudgeSkill(p);
+                }
             }
+            Ball.GhostTime = Math.Max(0f, Ball.GhostTime - dt);
+            if (Ball.GhostTime <= 0f) Ball.GhostPlayer = -1;
 
             foreach (var p in _players) TakeActions(p, inputs[p.Id]);
+            UpdateShielding();
             foreach (var p in _players) MovePlayer(p, inputs[p.Id], dt);
             SeparatePlayers();
 
@@ -182,6 +198,7 @@ namespace MonkeyPost.Core
                 // Kicks happen when the ball is in reach: now, or within a short window
                 // (first-time shots and passes, or a carrier whose last touch ran a little long).
                 p.PendingKick = input.Shoot ? KickType.Shot : KickType.Pass;
+                p.PendingThrough = !input.Shoot && input.ThroughBall;
                 p.PendingAim = input.Aim;
                 p.PendingPower = input.Power;
                 p.PendingDirection = input.Move;
@@ -193,6 +210,9 @@ namespace MonkeyPost.Core
                 if (p.IsKeeper) Stretch(p);
                 else TryTackle(p);
             }
+
+            if (input.Skill.LengthSquared > 0.01f && Ball.Owner == p.Id && p.SkillCooldown <= 0f && !p.IsKeeper)
+                TrySkill(p, input.Skill.Normalized);
         }
 
         void MovePlayer(PlayerState p, PlayerInput input, float dt)
@@ -211,7 +231,15 @@ namespace MonkeyPost.Core
                     move = (Ball.Position - p.Position).Normalized;
                 }
                 p.DesiredMove = move;
-                PlayerMotion.Steer(p, move, input.Sprint, Ball.Owner == p.Id, Config, dt);
+                bool shieldingStill = p.IsShielding && move.LengthSquared < 0.04f;
+                PlayerMotion.Steer(p, move, input.Sprint, Ball.Owner == p.Id, Config, dt, Config.Traits(p.Team).Pace);
+                if (p.IsShielding)
+                {
+                    // Body between defender and ball: face away from the defender, and only creep.
+                    var defender = NearestOpponent(p, Config.ShieldRange);
+                    if (defender != null && shieldingStill) p.Facing = (p.Position - defender.Position).Normalized;
+                    p.Velocity = p.Velocity.ClampLength(Config.ShieldMaxSpeed);
+                }
             }
 
             p.Position += p.Velocity * dt;
@@ -268,11 +296,15 @@ namespace MonkeyPost.Core
                     var delta = b.Position - a.Position;
                     float distance = delta.Length;
                     if (distance >= minDistance) continue;
+                    // A nutmegger spins round the defender whose legs they've just gone through.
+                    if (a.SlipPast == b.Id || b.SlipPast == a.Id) continue;
 
                     var normal = distance > 1e-4f ? delta / distance : new Vec2(0f, 1f);
-                    var push = normal * ((minDistance - distance) * 0.5f);
-                    a.Position -= push;
-                    b.Position += push;
+                    // A shielding carrier is braced and gives far less ground.
+                    float shareA = a.IsShielding == b.IsShielding ? 0.5f : a.IsShielding ? 0.2f : 0.8f;
+                    float overlap = minDistance - distance;
+                    a.Position -= normal * (overlap * shareA);
+                    b.Position += normal * (overlap * (1f - shareA));
 
                     // Equal-mass, mostly inelastic shove: momentum carries into the other player.
                     float closing = Vec2.Dot(a.Velocity - b.Velocity, normal);
@@ -293,6 +325,7 @@ namespace MonkeyPost.Core
         void StepBall(float h)
         {
             BallPhysics.Integrate(ref Ball.Body, Config, _surface, _rng, h);
+            TrackNutmeg();
             ResolvePendingKicks();
             TouchWhileDribbling();
             PlayerContacts();
@@ -395,6 +428,7 @@ namespace MonkeyPost.Core
                 if (p.PendingKick == KickType.Shot) Shoot(p);
                 else Pass(p);
                 p.PendingKick = KickType.None;
+                p.PendingThrough = false;
                 return;
             }
         }
@@ -441,9 +475,31 @@ namespace MonkeyPost.Core
             }
 
             KickPlan plan;
+            bool through = p.PendingThrough && receiver != null;
             if (receiver == null)
             {
                 plan = ShotPhysics.PlanPass(Config, Ball.Position, Ball.Position + aim * 10f, p.IsKeeper ? 2f : 1f);
+                Ball.IntendedReceiver = -1;
+            }
+            else if (through)
+            {
+                // Into the space ahead of the runner, timed so ball and runner arrive together.
+                var run = (new Vec2(AttackDirection(p.Team), 0f) + receiver.Velocity.Normalized * 0.6f).Normalized;
+                float runnerSpeed = Math.Max(receiver.Velocity.Length, Config.JogSpeed);
+                float lead = Clamp(Config.ThroughBallMinLead + Vec2.Distance(receiver.Position, Ball.Position) * 0.15f,
+                    Config.ThroughBallMinLead, Config.ThroughBallMaxLead);
+                Vec2 target = receiver.Position;
+                plan = default;
+                for (int i = 0; i < 6; i++, lead += 1f)
+                {
+                    target = ClampToPitch(receiver.Position + run * lead, 1f);
+                    float runnerTime = Vec2.Distance(receiver.Position, target) / runnerSpeed;
+                    plan = ShotPhysics.PlanTimedPass(Config, Ball.Position, target, runnerTime + 0.1f, 2f, out float ballTime);
+                    // Too far for the ball to get there in time: aim further ahead.
+                    if (ballTime <= runnerTime + 0.4f) break;
+                }
+                Ball.IntendedReceiver = receiver.Id;
+                Ball.IntendedTarget = target;
             }
             else
             {
@@ -457,6 +513,8 @@ namespace MonkeyPost.Core
                     target = receiver.Position + receiver.Velocity * time;
                 }
                 plan = ShotPhysics.PlanPass(Config, Ball.Position, target, p.IsKeeper ? 2f : 1f);
+                Ball.IntendedReceiver = receiver.Id;
+                Ball.IntendedTarget = target;
             }
 
             float offBalance = OffBalance(p, plan.Velocity.XY);
@@ -468,7 +526,7 @@ namespace MonkeyPost.Core
             }
 
             Kick(p, plan);
-            _events.Add(new MatchEvent(MatchEventType.Pass, p.Id, receiver?.Id ?? -1, p.Team));
+            _events.Add(new MatchEvent(MatchEventType.Pass, p.Id, receiver?.Id ?? -1, p.Team, through ? 1 : 0));
         }
 
         /// <summary>0 when facing the kick direction, rising to 1 when kicking back over the shoulder.</summary>
@@ -516,7 +574,8 @@ namespace MonkeyPost.Core
             }
             else
             {
-                float error = (p.IsSprinting ? TouchErrorSprint : TouchErrorJog) * (1f - 0.5f * Config.DribbleAssist);
+                float error = (p.IsSprinting ? TouchErrorSprint : TouchErrorJog) * (1f - 0.5f * Config.DribbleAssist)
+                              / Config.Traits(p.Team).Touch;
                 velocity = direction.Rotate(_rng.Range(-1f, 1f) * error) * (speed + lead * TouchPushPerLead);
             }
 
@@ -534,6 +593,7 @@ namespace MonkeyPost.Core
                 var outward = new Vec2(AttackDirection(p.Team), 0f);
                 return Vec2.Dot(p.DesiredMove, outward) > 0.2f ? p.DesiredMove.Normalized : outward;
             }
+            if (p.FeintTime > 0f) return p.FeintDirection;
             if (p.DesiredMove.LengthSquared > 0.04f) return p.DesiredMove.Normalized;
             if (p.Velocity.LengthSquared > 0.25f) return p.Velocity.Normalized;
             return p.Facing;
@@ -552,6 +612,11 @@ namespace MonkeyPost.Core
             var direction = DribbleDirection(p);
             float lead = (p.IsSprinting ? Config.DribbleLeadSprint : Config.DribbleLeadJog) * 0.7f;
             var leadPoint = p.Position + direction * lead;
+            if (p.IsShielding)
+            {
+                var defender = NearestOpponent(p, Config.ShieldRange);
+                if (defender != null) leadPoint = p.Position + (p.Position - defender.Position).Normalized * 0.5f;
+            }
             var desired = p.Velocity + (leadPoint - Ball.Position) * 2.5f;
             float blend = Clamp(Config.DribbleAssist * 3f * dt, 0f, 1f);
             var velocity = Ball.Velocity + (desired - Ball.Velocity) * blend;
@@ -579,7 +644,7 @@ namespace MonkeyPost.Core
             // Then bodies and keepers' legs deflect the ball.
             foreach (var p in _players)
             {
-                if (p == controller || p.Id == Ball.Owner || p.KickCooldown > 0f) continue;
+                if (p == controller || p.Id == Ball.Owner || p.KickCooldown > 0f || p.Id == Ball.GhostPlayer) continue;
                 BodyContact(p);
                 if (p.IsKeeper && p.StretchTime > 0f) FootContact(p);
             }
@@ -588,6 +653,7 @@ namespace MonkeyPost.Core
         bool CanControl(PlayerState p)
         {
             if (p.Id == Ball.Owner || p.StunTime > 0f || p.KickCooldown > 0f || p.PendingKick != KickType.None) return false;
+            if (p.Id == Ball.GhostPlayer) return false;
             if (Ball.Height > Config.ControlHeight) return false;
             var relative = Ball.Body.Velocity - new Vec3(p.Velocity, 0f);
             float relativeSpeed = relative.Length;
@@ -618,7 +684,7 @@ namespace MonkeyPost.Core
             float incoming = relative.Length;
             float error = Math.Max(0f, incoming - Config.FirstTouchCleanSpeed) * Config.FirstTouchErrorPerSpeed;
             if (Ball.Height > 0.3f) error *= 1.5f;
-            error = Math.Min(error, 0.8f);
+            error = Math.Min(error / Config.Traits(p.Team).Touch, 0.8f);
 
             // Kill the ball and set it moving the way the player wants to go; fast or bouncing
             // balls are harder to kill, so the touch can run away from them.
@@ -630,6 +696,7 @@ namespace MonkeyPost.Core
             Ball.Body.Spin = BallPhysics.RollingSpin(velocity, Config.BallRadius);
 
             Ball.Owner = p.Id;
+            Ball.IntendedReceiver = -1;
             p.TouchCooldown = Config.TouchCooldownSeconds;
             LastTouchPlayer = LastKickPlayer = p.Id;
         }
@@ -694,7 +761,11 @@ namespace MonkeyPost.Core
             // Timing matters: a ball between touches (away from the carrier's feet) is easier to win.
             float looseness = Clamp((Vec2.Distance(victim.Position, Ball.Position) - 0.35f) / 0.9f, 0f, 1f);
             float facing = distance > 0.01f ? Math.Max(0f, Vec2.Dot(tackler.Facing, toBall / distance)) : 1f;
-            float chance = Config.TackleSuccessChance * (0.6f + 0.4f * facing) * (0.55f + 0.45f * looseness);
+            float chance = Config.TackleSuccessChance * (0.6f + 0.4f * facing) * (0.55f + 0.45f * looseness)
+                           * Config.Traits(tackler.Team).Tackling;
+            // Coming from behind a shielding carrier, the body is in the way.
+            if (victim.IsShielding && Vec2.Dot(Ball.Position - victim.Position, tackler.Position - victim.Position) < 0f)
+                chance *= Config.ShieldTackleFactor;
 
             if (_rng.Chance(chance))
             {
@@ -720,6 +791,161 @@ namespace MonkeyPost.Core
             keeper.StretchTime = Config.KeeperStretchSeconds;
             var toBall = Ball.Position - keeper.Position;
             keeper.StretchDirection = toBall.LengthSquared > 1e-4f ? toBall.Normalized : keeper.Facing;
+        }
+
+        // ---- Skill moves and shielding -----------------------------------------------------------
+
+        PlayerState NearestOpponent(PlayerState p, float within)
+        {
+            PlayerState best = null;
+            float bestDistance = within;
+            foreach (var o in _players)
+            {
+                if (o.Team == p.Team) continue;
+                float d = Vec2.Distance(o.Position, p.Position);
+                if (d < bestDistance)
+                {
+                    bestDistance = d;
+                    best = o;
+                }
+            }
+            return best;
+        }
+
+        void UpdateShielding()
+        {
+            foreach (var p in _players) p.IsShielding = false;
+            if (Ball.Owner < 0) return;
+            var carrier = _players[Ball.Owner];
+            if (carrier.IsKeeper || carrier.IsSprinting || carrier.StunTime > 0f) return;
+            if (carrier.Velocity.Length > Config.ShieldMaxSpeed) return;
+            carrier.IsShielding = NearestOpponent(carrier, Config.ShieldRange) != null;
+        }
+
+        void TrySkill(PlayerState p, Vec2 swipe)
+        {
+            if (Ball.Height > Config.KickHeight || Vec2.Distance(p.Position, Ball.Position) > Config.TouchReach + 0.2f) return;
+
+            var direction = DribbleDirection(p);
+            float along = Vec2.Dot(swipe, direction);
+            var defender = NearestOpponent(p, Config.SkillRange);
+
+            p.SkillCooldown = Config.SkillCooldownSeconds;
+            p.SkillDefender = defender?.Id ?? -1;
+            p.SkillTime = Config.SkillJudgeSeconds;
+            p.SkillPassedDefender = false;
+
+            if (along > 0.6f) Nutmeg(p, direction, defender);
+            else if (along < -0.6f) DragBack(p, direction);
+            else StepOver(p, direction, swipe, defender);
+
+            _events.Add(new MatchEvent(MatchEventType.SkillAttempt, p.Id, p.SkillDefender, p.Team, (int)p.ActiveSkill));
+        }
+
+        /// <summary>A defender mid-stride, lunging or stretching has their legs open.</summary>
+        bool LegsOpen(PlayerState defender) =>
+            defender.Velocity.Length > Config.LegsOpenSpeed
+            || defender.StunTime > 0f
+            || defender.StretchTime > 0f
+            || defender.TackleCooldown > Config.TackleCooldownSeconds - 0.35f;
+
+        void Nutmeg(PlayerState p, Vec2 direction, PlayerState defender)
+        {
+            p.ActiveSkill = SkillMove.Nutmeg;
+            var velocity = direction * Config.NutmegSpeed + p.Velocity * 0.2f;
+            Ball.Body.Velocity = new Vec3(velocity, 0f);
+            Ball.Body.Spin = BallPhysics.RollingSpin(velocity, Config.BallRadius);
+            Ball.Owner = -1;
+            Ball.IntendedReceiver = p.Id;
+            p.KickCooldown = 0.35f;
+            LastTouchPlayer = LastKickPlayer = p.Id;
+
+            if (defender == null) return;
+            // Through the legs only if the defender is in the ball's path with their legs open;
+            // otherwise the ball runs into them like any other touch.
+            var toDefender = defender.Position - Ball.Position;
+            float ahead = Vec2.Dot(toDefender, direction);
+            float off = Math.Abs(Vec2.Dot(toDefender, direction.Perpendicular));
+            if (ahead > 0f && ahead < Config.SkillRange && off < 0.6f && LegsOpen(defender))
+            {
+                Ball.GhostPlayer = defender.Id;
+                Ball.GhostTime = 0.5f;
+                p.SlipPast = defender.Id;
+                p.SlipTime = 0.6f;
+            }
+        }
+
+        void TrackNutmeg()
+        {
+            if (Ball.GhostPlayer < 0) return;
+            var defender = _players[Ball.GhostPlayer];
+            foreach (var p in _players)
+            {
+                if (p.ActiveSkill != SkillMove.Nutmeg || p.SkillDefender != defender.Id || p.SkillPassedDefender) continue;
+                if (Vec2.Dot(Ball.Position - defender.Position, Ball.Velocity) > 0.2f * Ball.Velocity.Length)
+                    p.SkillPassedDefender = true;
+            }
+        }
+
+        void DragBack(PlayerState p, Vec2 direction)
+        {
+            p.ActiveSkill = SkillMove.DragBack;
+            // Sole on the ball, roll it back and turn: the move is a planted stop.
+            var velocity = p.Velocity * 0.15f - direction * 1.2f;
+            Ball.Body.Velocity = new Vec3(velocity, 0f);
+            Ball.Body.Spin = BallPhysics.RollingSpin(velocity, Config.BallRadius);
+            p.Velocity *= 0.3f;
+            p.Facing = -direction;
+            p.TouchCooldown = 0.25f;
+            LastTouchPlayer = LastKickPlayer = p.Id;
+        }
+
+        void StepOver(PlayerState p, Vec2 direction, Vec2 swipe, PlayerState defender)
+        {
+            p.ActiveSkill = SkillMove.StepOver;
+            var side = direction.Perpendicular * (Vec2.Dot(swipe, direction.Perpendicular) >= 0f ? 1f : -1f);
+            p.Velocity *= 0.8f;
+
+            // Then go the other way.
+            p.FeintDirection = (direction - side * 0.7f).Normalized;
+            p.FeintTime = 0.5f;
+
+            if (defender == null || defender.StunTime > 0f) return;
+            bool watching = Vec2.Dot(defender.Facing, (p.Position - defender.Position).Normalized) > 0.3f;
+            if (!watching) return;
+            // Wrong-footed: the defender shifts their weight towards the fake and can't tackle yet.
+            defender.Velocity += side * Config.StepOverShove;
+            defender.TackleCooldown = Math.Max(defender.TackleCooldown, 0.5f);
+        }
+
+        /// <summary>
+        /// A skill move succeeds the moment it has beaten its defender with the ball still in the
+        /// team's possession; it fails if that hasn't happened when the judging window runs out.
+        /// </summary>
+        void JudgeSkill(PlayerState p)
+        {
+            var skill = p.ActiveSkill;
+            int defenderId = p.SkillDefender;
+            bool expired = p.SkillTime <= 0f;
+            if (defenderId < 0)
+            {
+                if (expired) p.ActiveSkill = SkillMove.None;
+                return;
+            }
+
+            bool keptIt = Ball.Owner >= 0 && TeamOf(Ball.Owner) == p.Team;
+            bool lostIt = Ball.Owner >= 0 && TeamOf(Ball.Owner) != p.Team;
+            var defender = _players[defenderId];
+            var attack = new Vec2(AttackDirection(p.Team), 0f);
+            bool shakenOff = Vec2.Dot(Ball.Position - defender.Position, attack) > 0.5f
+                             || Vec2.Distance(Ball.Position, defender.Position) > 2f;
+            float elapsed = Config.SkillJudgeSeconds - p.SkillTime;
+            bool success = skill == SkillMove.Nutmeg
+                ? keptIt && p.SkillPassedDefender
+                : keptIt && shakenOff && elapsed >= Config.SkillMinSeconds;
+
+            if (success) _events.Add(new MatchEvent(MatchEventType.SkillBeat, p.Id, defenderId, p.Team, (int)skill));
+            if (success || lostIt || expired) p.ActiveSkill = SkillMove.None;
         }
 
         // ---- Match flow ------------------------------------------------------------------------
@@ -763,8 +989,13 @@ namespace MonkeyPost.Core
                 p.Facing = new Vec2(AttackDirection(p.Team), 0f);
                 p.StunTime = p.KickCooldown = p.TackleCooldown = p.TouchCooldown = p.StretchTime = 0f;
                 p.PendingKick = KickType.None;
+                p.PendingThrough = false;
                 p.PendingTime = 0f;
                 p.DesiredMove = Vec2.Zero;
+                p.ActiveSkill = SkillMove.None;
+                p.SkillCooldown = p.FeintTime = p.SlipTime = 0f;
+                p.SlipPast = -1;
+                p.IsShielding = false;
                 p.IsSprinting = false;
             }
 
@@ -773,6 +1004,7 @@ namespace MonkeyPost.Core
             taker.Position = centre - taker.Facing * 0.5f;
 
             Ball.Owner = taker.Id;
+            Ball.IntendedReceiver = Ball.GhostPlayer = -1;
             Ball.Body = new BallBody { Centre = new Vec3(centre, Config.BallRadius) };
             LastTouchPlayer = LastKickPlayer = taker.Id;
 
@@ -781,6 +1013,9 @@ namespace MonkeyPost.Core
             PhaseTime = 0f;
             _events.Add(new MatchEvent(MatchEventType.Kickoff, taker.Id, team: team));
         }
+
+        Vec2 ClampToPitch(Vec2 p, float margin) =>
+            new Vec2(Clamp(p.X, margin, Config.PitchLength - margin), Clamp(p.Y, margin, Config.PitchWidth - margin));
 
         static float Clamp(float value, float min, float max) => value < min ? min : value > max ? max : value;
 
@@ -798,6 +1033,13 @@ namespace MonkeyPost.Core
             p.Position = position;
             p.Velocity = Vec2.Zero;
             p.Facing = facing.Normalized;
+        }
+
+        internal void SetVelocity(int id, Vec2 velocity)
+        {
+            var p = _players[id];
+            p.Velocity = velocity;
+            if (velocity.LengthSquared > 1e-6f) p.Facing = velocity.Normalized;
         }
 
         internal void PlaceBall(Vec2 position, Vec2 velocity, int owner = -1, float height = 0f, float verticalVelocity = 0f, Vec3 spin = default)

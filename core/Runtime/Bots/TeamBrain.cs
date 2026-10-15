@@ -26,6 +26,7 @@ namespace MonkeyPost.Core.Bots
 
         float _time;
         float _keeperHeldSince = -1f;
+        float _urgency;
 
         // The team's picture of the ball, refreshed every ReactionSeconds.
         Vec2 _seenBall;
@@ -48,6 +49,11 @@ namespace MonkeyPost.Core.Bots
         public void Think(MatchSnapshot view, float dt, int humanControlledId, PlayerInput[] inputs)
         {
             _time += dt;
+
+            // Game state: chase the game when losing late, sit deeper when winning late.
+            int lead = view.Score(Team) - view.Score(1 - Team);
+            bool late = view.IsGoldenGoal || view.TimeRemaining < 60f;
+            _urgency = !late || lead == 0 ? 0f : lead < 0 ? 0.08f : -0.06f;
             if (_time - _seenAt >= _profile.ReactionSeconds)
             {
                 _seenBall = view.Ball.Position;
@@ -78,7 +84,8 @@ namespace MonkeyPost.Core.Bots
             var ball = view.Ball;
             if (ball.Owner == id) return OnBall(view, me, slot, decide);
             if (me.IsKeeper) return Keeper(view, me, decide);
-            if (ball.Owner >= 0 && MatchSimulation.TeamOf(ball.Owner) == Team) return Shape(me, slot, attacking: true);
+            if (ball.Owner < 0 && ball.IntendedReceiver == id) return RunOntoPass(view, me);
+            if (ball.Owner >= 0 && MatchSimulation.TeamOf(ball.Owner) == Team) return Support(view, me, slot, ball.Owner);
             if (id == chaser) return Chase(view, me, decide);
             if (id == cover) return Cover(me);
             return Shape(me, slot, attacking: false);
@@ -128,6 +135,15 @@ namespace MonkeyPost.Core.Bots
             }
 
             float nearestOpponent = NearestOpponentDistance(view, me.Position);
+
+            var skill = TrySkill(view, me, slot, oppGoal);
+            if (skill.HasValue) return skill.Value;
+
+            // A teammate running in behind with space ahead: play it into their path.
+            int runner = BestRunner(view, me);
+            if (runner >= 0 && _rng.Chance(_profile.PassVision * 0.7f))
+                return new PlayerInput { Move = (view.Players[runner].Position - me.Position).Normalized, Pass = true, ThroughBall = true };
+
             int mate = BestPassTarget(view, me, requireForward: nearestOpponent >= PressureRadius);
             if (mate >= 0 && (nearestOpponent < PressureRadius || _rng.Chance(_profile.PassVision * 0.25f)))
             {
@@ -140,6 +156,102 @@ namespace MonkeyPost.Core.Bots
                 Sprint = nearestOpponent > 3f && me.Stamina > 0.3f,
             };
             return _plan[slot];
+        }
+
+        /// <summary>Takes on a close defender with a skill move, choosing the one the situation invites.</summary>
+        PlayerInput? TrySkill(MatchSnapshot view, PlayerSnapshot me, int slot, Vec2 oppGoal)
+        {
+            var direction = DribbleDirection(view, me, oppGoal);
+            PlayerSnapshot? closest = null;
+            float closestDistance = 1.8f;
+            foreach (var p in view.Players)
+            {
+                if (p.Team == Team) continue;
+                var toOpponent = p.Position - me.Position;
+                float distance = toOpponent.Length;
+                if (distance < closestDistance && Vec2.Dot(toOpponent, direction) > 0f)
+                {
+                    closest = p;
+                    closestDistance = distance;
+                }
+            }
+            if (!closest.HasValue || !_rng.Chance(_profile.SkillChance)) return null;
+
+            var defender = closest.Value;
+            var toDefender = (defender.Position - me.Position).Normalized;
+            Vec2 swipe;
+            if (defender.Velocity.Length > _config.LegsOpenSpeed && Vec2.Dot(toDefender, direction) > 0.8f)
+            {
+                swipe = toDefender;  // legs open and square on: nutmeg
+            }
+            else if (closestDistance < 1.2f)
+            {
+                swipe = -direction;  // too tight: drag it back and turn away
+                _plan[slot] = new PlayerInput { Move = -direction };
+                return new PlayerInput { Move = -direction, Skill = swipe };
+            }
+            else
+            {
+                swipe = direction.Perpendicular * (_rng.Chance(0.5f) ? 1f : -1f);  // step-over
+            }
+            return new PlayerInput { Move = direction, Skill = swipe };
+        }
+
+        /// <summary>A teammate sprinting forward with space ahead of them, worth a through ball.</summary>
+        int BestRunner(MatchSnapshot view, PlayerSnapshot me)
+        {
+            var attack = new Vec2(MatchSimulation.AttackDirection(Team), 0f);
+            int best = -1;
+            float bestProgress = 2f;
+            for (int slot = 1; slot < Slots; slot++)
+            {
+                var mate = view.Players[MatchSimulation.PlayerId(Team, slot)];
+                if (mate.Id == me.Id || Vec2.Dot(mate.Velocity, attack) < 3f) continue;
+                float progress = Vec2.Dot(mate.Position - me.Position, attack);
+                if (progress < bestProgress) continue;
+
+                var space = mate.Position + attack * 4f;
+                bool clear = true;
+                foreach (var p in view.Players)
+                {
+                    if (p.Team == Team || p.IsKeeper) continue;
+                    if (Vec2.Distance(p.Position, space) < 2.5f || Vec2.DistanceToSegment(p.Position, me.Position, space) < 1f)
+                    {
+                        clear = false;
+                        break;
+                    }
+                }
+                if (!clear) continue;
+                bestProgress = progress;
+                best = mate.Id;
+            }
+            return best;
+        }
+
+        PlayerInput RunOntoPass(MatchSnapshot view, PlayerSnapshot me)
+        {
+            // Head for where the pass is going, then onto the ball itself as it arrives.
+            var ball = view.Ball;
+            var target = Vec2.Distance(ball.Position, me.Position) < 3f ? ball.Position + ball.Velocity * 0.2f : ball.IntendedTarget;
+            var delta = target - me.Position;
+            return new PlayerInput { Move = delta.Normalized, Sprint = delta.Length > 1.5f && me.Stamina > 0.2f };
+        }
+
+        /// <summary>Off the ball while a teammate has it: attackers run in behind when the carrier looks forward.</summary>
+        PlayerInput Support(MatchSnapshot view, PlayerSnapshot me, int slot, int carrierId)
+        {
+            var carrier = view.Players[carrierId];
+            var attack = new Vec2(MatchSimulation.AttackDirection(Team), 0f);
+            bool lookingForward = Vec2.Dot(carrier.Velocity, attack) > 1f || Vec2.Dot(carrier.Facing, attack) > 0.5f;
+            if (slot >= 3 && lookingForward && me.Stamina > 0.3f)
+            {
+                var oppGoal = MatchSimulation.GoalCentre(_config, 1 - Team);
+                float lane = slot == 3 ? -4f : 4f;
+                var target = new Vec2(oppGoal.X - attack.X * (_config.KeeperBoxDepth + 1.5f), oppGoal.Y + lane);
+                if (Vec2.Dot(target - me.Position, attack) > 1f && Vec2.Dot(target - carrier.Position, attack) > 2f)
+                    return new PlayerInput { Move = (target - me.Position).Normalized, Sprint = true };
+            }
+            return Shape(me, slot, attacking: true);
         }
 
         Vec2 DribbleDirection(MatchSnapshot view, PlayerSnapshot me, Vec2 goal)
@@ -275,7 +387,8 @@ namespace MonkeyPost.Core.Bots
         {
             var home = MatchSimulation.FormationSpot(_config, Team, slot);
             var ball = PerceivedBall(0f);
-            float push = (attacking ? 0.18f : -0.03f) * _config.PitchLength * MatchSimulation.AttackDirection(Team);
+            float push = (attacking ? 0.18f : -0.03f) + _urgency;
+            push *= _config.PitchLength * MatchSimulation.AttackDirection(Team);
             float pull = attacking ? 0.25f : 0.35f;
             var spot = new Vec2(home.X + push, home.Y + (ball.Y - home.Y) * pull);
             return Arrive(me, spot, sprintBeyond: 6f);

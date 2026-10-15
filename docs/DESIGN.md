@@ -56,10 +56,11 @@ Layout: **virtual joystick** under the left thumb, **three buttons** under the r
 
 | Button | With the ball | Without the ball |
 |---|---|---|
-| A | **Pass** to the teammate in the joystick direction | **Switch** to another teammate |
+| A | **Pass** to the teammate in the joystick direction; **double-tap: through ball** into space ahead of a runner | **Switch** to another teammate |
 | B | **Shoot**: hold to charge (power bar), let go to shoot; joystick up or down aims across the goal | **Tackle** |
 | Sprint | Hold to sprint (drains the stamina bar) | Same |
 
+- **Skill moves:** swipe anywhere else on the right half while dribbling (see §2c).
 - Too much shot power from mid-range flies over knee height. The power bar marks the "safe" zone
   for the current distance.
 - Control moves automatically to the ball carrier, or to whoever is closest to a loose or
@@ -148,6 +149,53 @@ slow balls are controlled; posts rebound; sprinting players plant before reversi
 
 ---
 
+## 2c. Skills, through balls, shielding and team strength
+
+**Status: confirmed by owner.**
+
+**Skill moves:** a small set, each a swipe on the right half while dribbling, relative to the
+direction you're running:
+
+| Swipe | Move | When it works |
+|---|---|---|
+| Forward | **Nutmeg**: knock it through the defender's legs and spin round him | Only if his **legs are open**: he's mid-stride (running at more than 2.5 m/s), lunging into a tackle, stumbling or stretching. Into a planted defender, it hits his legs. |
+| Back | **Drag-back**: sole on the ball, roll it back and turn away | A much quicker turn than planting and turning, for escaping pressure. |
+| Sideways | **Step-over**: fake that way, go the other | Wrong-foots a defender who is facing you within 2.5 m: he shifts his weight towards the fake and can't tackle for half a second. |
+
+- **Risk is about timing:** a badly timed move loses the ball. There's a 0.8 s cooldown between
+  moves.
+- **Reward:** a move counts as a success when it beats its defender and the team keeps the ball.
+  Success brings a "NUTMEG!" or "SKILL!" banner, a crowd roar and **bonus coins**. Getting
+  nutmegged shows "NUTMEGGED!". Nutmegs have **no special scoring rule**.
+
+**Through balls:** double-tap PASS. The ball is played into the space ahead of the teammate in the
+joystick direction, **timed so ball and runner arrive together** (the rolling physics is solved
+for the launch speed). A single tap waits 0.18 s for a possible second tap before passing.
+
+**Shielding (automatic):** a slow carrier (under 3 m/s, not sprinting) with a defender within
+1.6 m turns his back to the defender and keeps the ball on the far side. He gives far less ground
+in body contact, and tackles from behind succeed less than half as often. Sprinting cancels it.
+
+**Team strength:** a person's own team never has stats (skill decides, fair in 1v1, no
+pay-to-win). Computer teams get small physical edges on top of their skill level:
+
+| Level | Pace | Tackling | Touch |
+|---|---|---|---|
+| Easy | −3% | −10% | −10% |
+| Medium | — | — | — |
+| Hard | +3% | +10% | +10% |
+| Each street-cup round | +0.5% | +2% | +2% |
+
+**Computer teammates and opponents:** attackers **make runs in behind automatically** when the
+ball carrier is facing forward. Carriers **play through balls** to runners with space, take on
+close defenders with **skill moves** (Easy rarely, Hard often), and the intended receiver of a pass
+runs onto it. Teams **push up when losing late** and **sit deeper when winning late**.
+
+Measured over 30 matches each (Hard v Hard): about 20 skill moves a match, nearly half of them
+beating the defender. Easy teams try about 1.5 a match.
+
+---
+
 ## 3. Single-player modes and bots
 
 **Status: confirmed by owner (Part 3).**
@@ -192,10 +240,16 @@ dribbles round defenders, passes when pressed, and shoots when in range with an 
 
 A person's AI teammates always play at Medium.
 
-**Measured with bot-only matches** (30 matches each, run by the test suite, calibrated physics):
+**Measured with bot-only matches** (30 matches each, run by the test suite):
 
 | Match | Goals per 4-min match | Result |
 |---|---|---|
+| Easy v Easy | 2.4 | |
+| Medium v Medium | 3.1 | |
+| Hard v Hard | 4.7 | |
+| Hard v Easy | 4.0 | Hard won 25, drew 3, lost 2 |
+
+---|---|---|
 | Easy v Easy | 2.2 | |
 | Medium v Medium | 2.5 | |
 | Hard v Hard | 3.0 | |
@@ -234,6 +288,7 @@ A person's AI teammates always play at Medium.
 | Difficulty multiplier | Easy ×1, Medium ×1.5, Hard ×2 |
 | Cup winner bonus | Easy 150, Medium 250, Hard 400 (plus that level's exclusive item) |
 | Daily first win | +100 |
+| Skill move that beats a defender / nutmeg | +5 / +10 (max 50 a match) |
 | Rewarded ad | doubles the match's coins (not the daily or cup bonus) |
 | Local 1v1 match | flat 25, for up to 10 matches a day |
 
@@ -424,7 +479,7 @@ retired Play Games real-time multiplayer in 2020, and any replacement needs a se
   and stats come from whichever save has earned more in total. No prompts.
 - **Leaderboards** (Play Games provides daily, weekly and all-time views automatically):
   total goals scored, cups won, Hard cups won, and longest win streak vs bots.
-- **Achievements:** about 20 at launch (draft below, for review). Hidden ones are marked *(hidden)*.
+- **Achievements:** about 24 at launch (draft below, for review). Hidden ones are marked *(hidden)*.
 
 | # | Achievement | How to get it |
 |---|---|---|
@@ -448,6 +503,8 @@ retired Play Games real-time multiplayer in 2020, and any replacement needs a se
 | 18 | One More! | Play 3 rematches in a row |
 | 19 | Shopper | Buy your first shop item |
 | 20 | Collector | Unlock every ball |
+| 23 | Nutmeg King | Nutmeg 10 defenders |
+| 24 | Showboat | Beat 3 defenders with skill moves in one match |
 | 21 | Wrong End *(hidden)* | Score an own goal |
 | 22 | Last Gasp *(hidden)* | Score in the final 5 seconds to win |
 
