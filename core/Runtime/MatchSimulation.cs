@@ -33,6 +33,9 @@ namespace MonkeyPost.Core
         public float PhaseTime { get; private set; }
         public int KickoffTeam { get; private set; }
         public int LastTouchPlayer { get; private set; } = -1;
+
+        /// <summary>Full time has passed with the scores level and the next goal wins.</summary>
+        public bool IsGoldenGoal { get; private set; }
         public BallState Ball { get; } = new BallState();
         public IReadOnlyList<PlayerState> Players => _players;
 
@@ -89,13 +92,23 @@ namespace MonkeyPost.Core
             _events.Clear();
             if (Phase == Phase.Ended) return;
 
-            TimeRemaining -= dt;
-            if (TimeRemaining <= 0f)
+            if (!IsGoldenGoal)
             {
-                TimeRemaining = 0f;
-                Phase = Phase.Ended;
-                _events.Add(new MatchEvent(MatchEventType.MatchEnded));
-                return;
+                TimeRemaining -= dt;
+                if (TimeRemaining <= 0f)
+                {
+                    TimeRemaining = 0f;
+                    if (Config.GoldenGoalIfLevel && _score[0] == _score[1])
+                    {
+                        IsGoldenGoal = true;
+                        _events.Add(new MatchEvent(MatchEventType.GoldenGoal));
+                    }
+                    else
+                    {
+                        EndMatch();
+                        return;
+                    }
+                }
             }
 
             PhaseTime += dt;
@@ -109,7 +122,9 @@ namespace MonkeyPost.Core
                     }
                     break;
                 case Phase.GoalScored:
-                    if (PhaseTime >= Config.GoalCelebrationSeconds) ResetForKickoff(KickoffTeam);
+                    if (PhaseTime < Config.GoalCelebrationSeconds) break;
+                    if (IsGoldenGoal) EndMatch();
+                    else ResetForKickoff(KickoffTeam);
                     break;
                 case Phase.Play:
                     StepPlay(inputs, dt);
@@ -442,6 +457,12 @@ namespace MonkeyPost.Core
             PhaseTime = 0f;
             KickoffTeam = 1 - team;
             _events.Add(new MatchEvent(MatchEventType.Goal, LastTouchPlayer, team: team));
+        }
+
+        void EndMatch()
+        {
+            Phase = Phase.Ended;
+            _events.Add(new MatchEvent(MatchEventType.MatchEnded));
         }
 
         void ResetForKickoff(int team)

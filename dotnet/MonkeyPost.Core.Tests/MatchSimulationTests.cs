@@ -280,6 +280,43 @@ namespace MonkeyPost.Core.Tests
         }
 
         [Fact]
+        public void LevelCupTie_GoesToGoldenGoalAndEndsOnTheNextGoal()
+        {
+            var config = Precise();
+            config.MatchDurationSeconds = 1f;
+            config.GoldenGoalIfLevel = true;
+            var sim = InPlay(config);
+
+            bool goldenGoal = false;
+            RunUntil(sim, () => goldenGoal |= sim.Events.Any(e => e.Type == MatchEventType.GoldenGoal), 2f);
+            Assert.True(goldenGoal);
+            Assert.True(sim.IsGoldenGoal);
+            Assert.NotEqual(Phase.Ended, sim.Phase);
+
+            // Play carries on past full time until someone scores.
+            for (int i = 0; i < 90; i++) Step(sim);
+            Assert.NotEqual(Phase.Ended, sim.Phase);
+
+            GiveBall(sim, HomeStriker, new Vec2(28f, 10f), new Vec2(1f, 0f));
+            sim.PlacePlayer(AwayKeeper, new Vec2(35.5f, 3f), new Vec2(-1f, 0f));
+            var inputs = NoInput();
+            inputs[HomeStriker].Shoot = true;
+            inputs[HomeStriker].Power = 0.4f;
+            Step(sim, inputs);
+
+            Assert.True(RunUntil(sim, () => sim.Phase == Phase.Ended, 5f));
+            Assert.Equal(1, sim.Score(0));
+        }
+
+        [Fact]
+        public void LevelFriendly_EndsAsADraw()
+        {
+            var sim = new MatchSimulation(new MatchConfig { MatchDurationSeconds = 1f }, seed: 1);
+            Assert.True(RunUntil(sim, () => sim.Phase == Phase.Ended, 2f));
+            Assert.False(sim.IsGoldenGoal);
+        }
+
+        [Fact]
         public void Step_RejectsWrongInputCount()
         {
             var sim = new MatchSimulation(new MatchConfig(), seed: 1);

@@ -23,6 +23,9 @@ namespace MonkeyPost.Core
         public float KeeperBoxHalfWidth = 3.5f;
 
         public float MatchDurationSeconds = 240f;
+
+        /// <summary>If level at full time, play on until someone scores (used for cup ties).</summary>
+        public bool GoldenGoalIfLevel;
         public float KickoffSeconds = 1f;
         public float GoalCelebrationSeconds = 2.5f;
 

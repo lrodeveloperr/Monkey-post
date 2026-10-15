@@ -1,7 +1,7 @@
 # Monkey Post — Design Document
 
 Status: **v1 draft for owner review**
-Platform: Android (Google Play), worldwide
+Platform: Android (Google Play). Available worldwide, focused on Africa.
 Budget: **£0 running cost.** No servers, no databases, no paid services.
 
 Monkey Post is Nigerian street football played to tiny goals, the "monkey posts". This game is
@@ -20,11 +20,12 @@ a fast 5-a-side version: 4 outfield players and a keeper who may only use their 
 | 5 | Pitch | **Walled cage**: the ball never goes out of play. No throw-ins, corners or goal kicks. |
 | 6 | Controls | A person controls **the whole team, with auto-switch** to the best-placed player (like FIFA / eFootball). Bots move their teammates. |
 | 7 | Visual style | **2.5D, side-on broadcast camera** following the ball, played with the phone held sideways. Mobile URP. |
-| 8 | Audio and languages | Generic crowd noise plus a referee's whistle. No music or chants. Launches worldwide (see §8). |
+| 8 | Audio and languages | Generic crowd noise plus a referee's whistle. No music or chants. **English and French only.** Available worldwide so the diaspora can play, but focused on Africa (see §8). |
 | 9 | Running cost | £0. The only unavoidable cost is Google Play's one-off developer registration fee, if not already paid. |
 | 10 | Ownership | Company Play developer account (organisation account, which needs a free D-U-N-S number) and company AdMob account. |
 | 11 | Build process | Claude builds, owner reviews every PR. |
 | 12 | v1 scope | **Offline vs bots + local 1v1 via Nearby Connections** (one phone per team, same room, no internet). |
+| 13 | Single-player | **Quick match + 8-team street cup.** The player picks the difficulty, chooses a country (which sets the opponent teams) and customises their own team. |
 
 ---
 
@@ -41,7 +42,7 @@ fouls, computer-controlled keeper, 1.8 m goals and keeper staying in the box wer
 | Keeper | **Feet only**: can block and control with their feet, never catch. Must stay in their **box** (4 m deep, 7 m wide). | Your rule, plus a box so the keeper can't wander. |
 | Own box | Outfield players **can't enter their own box** | Stops defenders parking in front of a tiny goal. Attackers may enter. |
 | Fouls | None. Mistimed tackles leave the tackler briefly stunned. | Street rules, no referee stoppages. |
-| Clock | **4 minutes**, one period, then the final whistle | Short mobile session. A draw is a draw. |
+| Clock | **4 minutes**, one period, then the final whistle | Short mobile session. A draw is a draw, except in cup ties: **golden goal** (next goal wins). |
 | Kick-off | At the start, and by the conceding team after each goal | |
 
 **Controls and camera — status: confirmed by owner (Part 2).**
@@ -67,7 +68,39 @@ All numbers live in `MatchConfig` and will be tuned from playtests.
 
 ---
 
-## 3. Bots
+## 3. Single-player modes and bots
+
+**Status: confirmed by owner (Part 3).**
+
+### Modes
+- **Quick match:** pick an opponent and a difficulty (Easy / Medium / Hard), then play one match.
+- **Street cup:** 8-team knockout (quarter-final, semi-final, final). The player picks Easy, Medium
+  or Hard for the whole cup, and opponents get slightly stronger each round within that level.
+  Level cup ties go to **golden goal**. Winning a Hard cup is the headline achievement.
+- **Pause:** available in single player, and automatic when the app is minimised. No pausing in
+  local 1v1.
+
+### Countries
+The player chooses a **country**, which sets the **opponent teams**: fictional street teams named
+after that country's cities and neighbourhoods. Menus stay in English or French.
+
+| Country | Language suggested |
+|---|---|
+| Nigeria | English |
+| Ghana | English |
+| Kenya | English |
+| Cameroon | English or French |
+| Senegal | French |
+| Côte d'Ivoire | French |
+
+Players elsewhere (the diaspora, or anyone worldwide) pick any of these countries. More countries
+can be added later as content-only updates (team names, colours, badges).
+
+### Teams
+- Opponents are **fictional street teams**, never real clubs (no licensing).
+- The player's **own team**: name, kit colours and a badge from presets. Stored only on the phone.
+
+### Bots
 
 One `TeamBrain` per team plays every footballer that a person isn't controlling. Bots see the same
 `MatchSnapshot` as the UI, with a slightly delayed picture of the ball, so easier teams react late.
@@ -186,6 +219,8 @@ AdMob).
 
 - No email, phone number, location data, contacts, free-text chat, analytics SDK or own server.
 - Communication in local 1v1: preset emotes and quick phrases only (localised, no free text).
+- Team names typed by the player stay on their phone (and in their own Saved Games) and are never
+  shared with anyone else, except the opponent's phone in local 1v1.
 - Nearby Connections needs Bluetooth / Wi-Fi / nearby-device permissions (and location
   permission on older Android versions, required for Bluetooth discovery). We **never read or
   store location**. Permissions are only requested when the player opens Local 1v1.
@@ -209,19 +244,16 @@ policies.
 
 ## 8. Localization
 
-Launch set (about 20), chosen by Play reach plus home market:
+**English and French only** (owner decision, Part 3). Together they cover Nigeria, Ghana, Kenya,
+Cameroon, Senegal and Côte d'Ivoire, plus the diaspora.
 
-English, Nigerian Pidgin, Yoruba, Igbo, Hausa, Swahili, French, Spanish, Portuguese (BR), German,
-Italian, Russian, Turkish, Arabic (RTL), Hindi, Indonesian, Vietnamese, Thai, Japanese, Korean,
-Chinese (Simplified).
-
+- Plain English and French throughout, with no Pidgin or other local-language flavour.
+- The language defaults to the phone's setting (French if the phone is in French, otherwise
+  English) and can be changed in settings.
 - UI is **icon-first** (football is universal) so there are few strings to translate.
-- Unity Localization package. Fonts for non-Latin scripts load as language packs through Play
-  Asset Delivery so the base download stays small.
-- Claude drafts translations. Nigerian languages and Pidgin get a native-speaker review before
-  launch.
-- More languages are added after launch based on where installs come from (Play Console
-  statistics).
+- Unity Localization package. Both languages use Latin script, so no extra font packs are needed.
+- Claude drafts the French; a native French speaker reviews it before launch.
+- Store listing in English and French.
 
 ---
 

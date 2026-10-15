@@ -57,6 +57,7 @@ namespace MonkeyPost.Core
         public int HomeScore { get; private set; }
         public int AwayScore { get; private set; }
         public int KickoffTeam { get; private set; }
+        public bool IsGoldenGoal { get; private set; }
         public BallSnapshot Ball { get; private set; }
         public PlayerSnapshot[] Players { get; private set; } = Array.Empty<PlayerSnapshot>();
 
@@ -77,6 +78,7 @@ namespace MonkeyPost.Core
             HomeScore = sim.Score(0);
             AwayScore = sim.Score(1);
             KickoffTeam = sim.KickoffTeam;
+            IsGoldenGoal = sim.IsGoldenGoal;
             Ball = new BallSnapshot(sim.Ball);
 
             if (Players.Length != sim.Players.Count) Players = new PlayerSnapshot[sim.Players.Count];

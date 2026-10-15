@@ -44,6 +44,8 @@ namespace MonkeyPost.Core
         TackleMissed,
         Save,
         Block,
+        /// <summary>Full time with the scores level in a cup tie: next goal wins.</summary>
+        GoldenGoal,
         MatchEnded,
     }
 
