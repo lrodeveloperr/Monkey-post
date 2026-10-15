@@ -1,7 +1,8 @@
 # Monkey Post — Design Document
 
 Status: **v1 draft for owner review**
-Platform: Android (Google Play). Available worldwide, focused on Africa.
+Platform: Android (Google Play). **Nigerian concept, English only.** Listed worldwide so Nigerians
+abroad can play too.
 Budget: **£0 running cost.** No servers, no databases, no paid services.
 
 Monkey Post is Nigerian street football played to tiny goals, the "monkey posts". This game is
@@ -20,12 +21,12 @@ a fast 5-a-side version: 4 outfield players and a keeper who may only use their 
 | 5 | Pitch | **Walled cage**: the ball never goes out of play. No throw-ins, corners or goal kicks. |
 | 6 | Controls | A person controls **the whole team, with auto-switch** to the best-placed player (like FIFA / eFootball). Bots move their teammates. |
 | 7 | Visual style | **2.5D, side-on broadcast camera** following the ball, played with the phone held sideways. **Stylised low-poly**, men's teams. Mobile URP. |
-| 8 | Audio and languages | Generic crowd noise plus a referee's whistle. No music or chants. **English and French only.** Available worldwide so the diaspora can play, but focused on Africa (see §8). |
+| 8 | Audio and languages | Generic crowd noise plus a referee's whistle. No music or chants. **English only.** The concept is **Nigeria only for now**, but the app is listed worldwide so Nigerians abroad can play (see §8). |
 | 9 | Running cost | £0. The only unavoidable cost is Google Play's one-off developer registration fee, if not already paid. |
 | 10 | Ownership | **Worksbien Studios Inc.** Company Play developer account (organisation account, which needs a free D-U-N-S number) and company AdMob account. |
 | 11 | Build process | Claude builds, owner reviews every PR. |
 | 12 | v1 scope | **Offline vs bots + local 1v1 via Nearby Connections** (one phone per team, same room, no internet). |
-| 13 | Single-player | **Quick match + 8-team street cup.** The player picks the difficulty, chooses a country (which sets the opponent teams) and customises their own team. |
+| 13 | Single-player | **Quick match + 8-team street cup** against fictional Nigerian street teams. The player picks the difficulty and customises their own team. |
 
 ---
 
@@ -80,21 +81,12 @@ All numbers live in `MatchConfig` and will be tuned from playtests.
 - **Pause:** available in single player, and automatic when the app is minimised. No pausing in
   local 1v1.
 
-### Countries
-The player chooses a **country**, which sets the **opponent teams**: fictional street teams named
-after that country's cities and neighbourhoods. Menus stay in English or French.
-
-| Country | Language suggested |
-|---|---|
-| Nigeria | English |
-| Ghana | English |
-| Kenya | English |
-| Cameroon | English or French |
-| Senegal | French |
-| Côte d'Ivoire | French |
-
-Players elsewhere (the diaspora, or anyone worldwide) pick any of these countries. More countries
-can be added later as content-only updates (team names, colours, badges).
+### Setting: Nigeria only (for now)
+Owner decision: the concept is **Naija only** for now. There is no country choice. All opponents
+are fictional street teams from Nigerian cities and neighbourhoods (Lagos, Ibadan, Abuja, Port
+Harcourt, Kano, Enugu and more), and all pitches are Nigerian. Other countries can be added later
+as content-only updates (team names, colours, badges, pitches), since nothing in the code depends
+on the country.
 
 ### Teams
 - Opponents are **fictional street teams**, never real clubs (no licensing).
@@ -178,17 +170,17 @@ A Medium win with two goals pays (20 + 20 + 30) × 1.5 = 105 coins, so a common 
 - **Style:** stylised low-poly. Chunky, colourful, slightly exaggerated footballers with flat
   shading. Readable side-on on a small screen and light on cheap phones.
 - **Players:** men's teams.
-- **Pitches:** one per country, all walled to match the cage rule. Any player can unlock any of
-  them, whatever country they chose.
+- **Pitches:** six Nigerian pitches, all walled to match the cage rule. (Updated for the
+  Nigeria-only concept; the city choices are Claude's suggestion, open to change.)
 
-| Pitch | Country | How to get it |
+| Pitch | City | How to get it |
 |---|---|---|
-| Lagos street cage | Nigeria | Free from the start |
-| Accra beach | Ghana | Shop |
-| Nairobi rooftop | Kenya | Shop |
-| Dakar sand court | Senegal | Shop |
-| Abidjan market court | Côte d'Ivoire | Shop |
-| Douala school field | Cameroon | Shop |
+| Street cage | Lagos | Free from the start |
+| School field | Ibadan | Shop |
+| Estate court | Abuja | Shop |
+| Waterfront court | Port Harcourt | Shop |
+| Sand court | Kano | Shop |
+| Hillside court | Enugu | Shop |
 
 - **Match audio:** generic crowd noise reacting to play (rising on attacks, roaring on goals), a
   referee's whistle (kick-off, goals, full time), ball kicks and wall thuds. No commentary, music
@@ -208,13 +200,11 @@ A Medium win with two goals pays (20 + 20 + 30) × 1.5 = 105 coins, so a common 
 **Status: confirmed by owner (Part 9).**
 
 **First launch:**
-1. **Country picker** (Nigeria, Ghana, Kenya, Cameroon, Senegal, Côte d'Ivoire). Shown in the
-   phone's language (English or French).
-2. **Guided first match** straight away: a short match against Easy bots with the default team,
+1. **Guided first match** straight away: a short match against Easy bots with the default team,
    with on-screen hints that appear as each action becomes useful (move, sprint, pass, shoot and
    charge power, tackle, switch). It can be skipped.
-3. **Full-time screen: "Name your team!"** Name, kit colours and badge.
-4. Ad consent form (UMP), only for users in regions that require it, then the home screen.
+2. **Full-time screen: "Name your team!"** Name, kit colours and badge.
+3. Ad consent form (UMP), only for users in regions that require it, then the home screen.
    No ads are shown before this point anyway (no interstitials in the first 3 matches).
 
 **Home screen:**
@@ -231,8 +221,6 @@ A Medium win with two goals pays (20 + 20 + 30) × 1.5 = 105 coins, so a common 
 
 | Setting | Options |
 |---|---|
-| Language | English / French (defaults to the phone's language) |
-| Country | Changes the opponent teams |
 | Left-handed layout | Mirrors the controls: joystick right, buttons left |
 | Control size and transparency | Sliders for the joystick and buttons |
 | Colour-blind friendly kits | Forces strongly contrasting kits and shows a marker above your team's players |
@@ -252,14 +240,13 @@ A Medium win with two goals pays (20 + 20 + 30) × 1.5 = 105 coins, so a common 
 |---|---|
 | Publisher (Play developer name) | **Worksbien Studios Inc.** |
 | App name on Play | **Monkey Post: Street Football** |
-| Store listing languages | English and French |
+| Store listing language | English |
 | Support email (public on the store) | **info@worksbienstudios.com** |
 | Website | The company's existing website (assumed `worksbienstudios.com`, to confirm) |
 | Privacy policy | A page on the company website, e.g. `worksbienstudios.com/monkeypost/privacy` |
-| app-ads.txt | Must be at the **root** of the domain listed on the store: `worksbienstudios.com/app-ads.txt` |
+| AdMob | **Handled by Worksbien Studios**: AdMob account, app and ad unit IDs, payments, app-ads.txt on the company domain, and the consent (UMP) messages in AdMob's Privacy & messaging. The app only needs the IDs. |
 
-Claude drafts the privacy policy (English and French) and the app-ads.txt contents. The company
-adds them to its website.
+Claude drafts the privacy policy (English). The company adds it to its website.
 
 ---
 
@@ -401,8 +388,9 @@ retired Play Games real-time multiplayer in 2020, and any replacement needs a se
 - **UMP consent form** for users in the EEA, UK and Switzerland, plus US state privacy messages.
   This is still required with non-personalised ads, because ads use device storage for frequency
   capping and fraud prevention. If consent is refused, Google serves limited ads.
-- **app-ads.txt** must be hosted on the developer website listed on the store page. A free
-  GitHub Pages site works and can also host the privacy policy.
+- **AdMob setup is handled by Worksbien Studios** (account, ad units, app-ads.txt, consent
+  messages). The app integrates the Google Mobile Ads and UMP SDKs and reads the ad unit IDs
+  from config.
 
 ---
 
@@ -428,7 +416,8 @@ AdMob).
 - Data encrypted in transit: yes. Deletion: no account data held by us. Saved Games data can be
   deleted by the player in Play Games.
 
-**Documents to publish (free, GitHub Pages):** privacy policy, app-ads.txt, support contact.
+**Documents to publish (company website):** privacy policy and support contact. app-ads.txt is
+handled by the company with its AdMob setup.
 
 **Regulations covered by this design:** Nigeria NDPA 2023, GDPR / UK GDPR (through UMP and
 non-personalised ads), US state privacy laws (through UMP), Google Play User Data and Ads
@@ -438,17 +427,12 @@ policies.
 
 ## 8. Localization
 
-**Status: confirmed by owner (Parts 3 and 10).** **English and French only.** Together they cover Nigeria, Ghana, Kenya,
-Cameroon, Senegal and Côte d'Ivoire, plus the diaspora.
+**Status: confirmed by owner.** **English only** (Nigeria-only concept).
 
-- Plain English and French throughout, with no Pidgin or other local-language flavour.
-- The language defaults to the phone's setting (French if the phone is in French, otherwise
-  English) and can be changed in settings.
-- UI is **icon-first** (football is universal) so there are few strings to translate.
-- Unity Localization package. Both languages use Latin script, so no extra font packs are needed.
-- Claude drafts the French. **A native French speaker the owner knows reviews the full string
-  list before launch.**
-- Store listing in English and French.
+- Plain English throughout, with no Pidgin or other local-language flavour.
+- All text still lives in one string table rather than being hard-coded, so adding a language
+  later is a content job, not a code change.
+- Store listing in English.
 
 ---
 
@@ -487,8 +471,8 @@ Run the tests with `dotnet test dotnet/MonkeyPost.Core.Tests`.
 4. Play Games Services: sign-in, achievements, leaderboards, Saved Games.
 5. Coins and shop (kits, badges, balls, pitches, celebrations), cup-winner items, AdMob + UMP,
    interstitial and rewarded placements.
-6. Localization, audio (crowd, whistle), polish on low-end devices.
-7. Privacy policy, app-ads.txt, Data Safety form, store listing, closed test → production.
+6. Audio (crowd, whistle), polish on low-end devices.
+7. Privacy policy, Data Safety form, store listing, closed test → production.
 
 Note: new personal developer accounts must run a closed test with testers before production.
 Organisation accounts are currently exempt, but check this in Play Console at that milestone.
@@ -499,8 +483,8 @@ Organisation accounts are currently exempt, but check this in Play Console at th
 
 All 12 decision areas are confirmed. Remaining practical items:
 
-- Confirm the website domain (assumed `worksbienstudios.com`) and that pages and a root-level
-  `app-ads.txt` can be added to it.
+- Confirm the website domain (assumed `worksbienstudios.com`) for the privacy policy page.
 - Get a D-U-N-S number for Worksbien Studios Inc. (free) if the Play organisation account doesn't
   have one yet.
-- Line up the native French speaker for the string review before launch.
+- AdMob (account, ad unit IDs, app-ads.txt, consent messages): handled by Worksbien Studios. Send
+  the ad unit IDs when they exist; test IDs are used until then.
