@@ -316,6 +316,27 @@ namespace MonkeyPost.Core.Tests
             Assert.False(sim.IsGoldenGoal);
         }
 
+        [Theory]
+        [InlineData(-0.03f, true)]
+        [InlineData(0.08f, false)]
+        public void MaxSafePower_PredictsWhetherAShotGoesOver(float powerOffset, bool expectGoal)
+        {
+            var sim = InPlay();
+            var ballStart = new Vec2(26f + sim.Config.DribbleOffset, 10f);
+            float safe = ShotPhysics.MaxSafePower(sim.Config, sim.Config.PitchLength - ballStart.X);
+            Assert.InRange(safe, 0.3f, 0.95f);
+
+            GiveBall(sim, HomeStriker, new Vec2(26f, 10f), new Vec2(1f, 0f));
+            sim.PlacePlayer(AwayKeeper, new Vec2(35.5f, 3f), new Vec2(-1f, 0f));
+            var inputs = NoInput();
+            inputs[HomeStriker].Shoot = true;
+            inputs[HomeStriker].Power = safe + powerOffset;
+            Step(sim, inputs);
+
+            RunUntil(sim, () => sim.Phase == Phase.GoalScored || sim.Ball.Velocity.X < 0f);
+            Assert.Equal(expectGoal, sim.Phase == Phase.GoalScored);
+        }
+
         [Fact]
         public void Step_RejectsWrongInputCount()
         {

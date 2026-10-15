@@ -63,7 +63,7 @@ namespace MonkeyPost.Core
         public float ShotMinSpeed = 12f;
         public float ShotMaxSpeed = 24f;
         /// <summary>Upward speed of a full-power shot. Too much power and it flies over the posts.</summary>
-        public float ShotMaxLift = 4f;
+        public float ShotMaxLift = 6.5f;
         public float ShotSpreadBase = 0.02f;
         public float ShotSpreadPerPower = 0.06f;
 

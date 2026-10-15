@@ -117,9 +117,12 @@ namespace MonkeyPost.Core.Bots
                 float aim = _rng.Chance(_profile.AimSmartness)
                     ? awayFromKeeper * _rng.Range(0.35f, 0.8f)
                     : _rng.Range(-0.8f, 0.8f);
-                // Shoot harder from further out, but softly enough to stay under knee height.
-                float power = 0.35f + distanceToGoal * 0.035f + _rng.Range(-_profile.PowerError, _profile.PowerError);
-                return new PlayerInput { Shoot = true, Aim = aim, Power = Math.Max(0.25f, Math.Min(0.95f, power)) };
+                // Shoot harder from further out, but judge it to stay under knee height. Weaker
+                // bots misjudge more often and blaze it over.
+                float desired = 0.45f + distanceToGoal * 0.03f;
+                float safe = ShotPhysics.MaxSafePower(_config, Math.Abs(oppGoal.X - view.Ball.Position.X)) - 0.04f;
+                float power = Math.Min(desired, safe) + _rng.Range(-_profile.PowerError, _profile.PowerError);
+                return new PlayerInput { Shoot = true, Aim = aim, Power = Math.Max(0.25f, Math.Min(1f, power)) };
             }
 
             float nearestOpponent = NearestOpponentDistance(view, me.Position);

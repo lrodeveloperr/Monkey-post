@@ -6,6 +6,7 @@ Bluetooth / Wi-Fi using Google's Nearby Connections. No servers, no running cost
 
 - **Design and decisions:** [docs/DESIGN.md](docs/DESIGN.md)
 - **Rules, ball physics and bots:** [`core/`](core). Pure C#, used by the Unity app as a package.
+- **Unity app:** [`unity/`](unity). Builds an APK on every push; see [docs/BUILDING.md](docs/BUILDING.md).
 
 ## Run the tests
 

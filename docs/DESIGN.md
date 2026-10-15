@@ -46,6 +46,10 @@ fouls, computer-controlled keeper, 1.8 m goals and keeper staying in the box wer
 | Clock | **4 minutes**, one period, then the final whistle | Short mobile session. A draw is a draw, except in cup ties: **golden goal** (next goal wins). |
 | Kick-off | At the start, and by the conceding team after each goal | |
 
+**Knee-height tuning:** shots get enough lift that the rule matters at every range. The safe maximum
+is about 75–85% power from 4–16 m and rises at long range, where the ball has time to come down.
+The power bar shows this safe zone in green, and bots judge it too (weaker bots blaze more over).
+
 **Controls and camera — status: confirmed by owner (Part 2).**
 
 Layout: **virtual joystick** under the left thumb, **three buttons** under the right thumb.
@@ -438,7 +442,9 @@ policies.
 
 ## 9. Performance targets
 
-- Runs on 2 GB RAM Android Go phones. Android 7.0+ (subject to Unity 6 and Nearby minimums).
+- Runs on 2 GB RAM Android Go phones. **Android 8.0+** (owner decision), 64-bit and 32-bit ARM.
+- **Test device:** a cheap/older phone (e.g. a 2–3 GB Tecno, Infinix or Itel). If it's smooth there,
+  it's smooth everywhere.
 - 30 fps cap, URP mobile, baked lighting, under 5k triangles per footballer (10 on screen).
 - Base download under 60 MB.
 - Simulation tick 30 Hz. Local 1v1 snapshots 15 Hz, each a few hundred bytes (10 players + ball).
@@ -454,19 +460,24 @@ core/                          MonkeyPost.Core Unity package (pure C#, no engine
 dotnet/                        .NET projects that compile core/ for tests and CI
   MonkeyPost.Core.csproj
   MonkeyPost.Core.Tests/       xunit tests, including bot-vs-bot balance runs
-unity/                         Unity 6 project (next milestone)
+unity/                         Unity 6 project (6000.0 LTS); builds itself from code
 android/nearby-bridge/         Kotlin AAR wrapping Nearby Connections (milestone 3)
 ```
 
 Run the tests with `dotnet test dotnet/MonkeyPost.Core.Tests`.
 
+**Builds (owner decision):** every push builds an APK on GitHub Actions (GameCI, free Unity
+Personal). The owner downloads it from the Actions tab and installs it on the test phone. No local
+Unity install is needed. One-off licence setup and install steps: [BUILDING.md](BUILDING.md).
+
 ---
 
 ## 11. Milestones
 
-1. **Rules engine + bots** (pure C#, unit-tested). ← this PR
+1. **Rules engine + bots** (pure C#, unit-tested). ✓
 2. Unity project: 2.5D cage pitch, side-on camera, footballers, touch controls, offline match vs
-   bots, full-time screen.
+   bots, full-time screen. ← **playable prototype with placeholder art built from primitives**;
+   the CC0 low-poly art, URP and remaining screens follow.
 3. Nearby Connections bridge + local 1v1 lobby (host / join).
 4. Play Games Services: sign-in, achievements, leaderboards, Saved Games.
 5. Coins and shop (kits, badges, balls, pitches, celebrations), cup-winner items, AdMob + UMP,

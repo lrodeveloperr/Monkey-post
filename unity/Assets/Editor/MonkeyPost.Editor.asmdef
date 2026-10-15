@@ -1,0 +1,9 @@
+{
+  "name": "MonkeyPost.Editor",
+  "rootNamespace": "MonkeyPost.EditorTools",
+  "references": [],
+  "includePlatforms": ["Editor"],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "autoReferenced": true
+}
