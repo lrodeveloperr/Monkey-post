@@ -19,7 +19,7 @@ a fast 5-a-side version: 4 outfield players and a keeper who may only use their 
 | 4 | Match format | **5-a-side: 4 outfield + 1 feet-only keeper.** One 4-minute clock, no halves, no substitutes ("no bench"). Draws allowed. |
 | 5 | Pitch | **Walled cage**: the ball never goes out of play. No throw-ins, corners or goal kicks. |
 | 6 | Controls | A person controls **the whole team, with auto-switch** to the best-placed player (like FIFA / eFootball). Bots move their teammates. |
-| 7 | Visual style | **2.5D, side-on broadcast camera** following the ball, played with the phone held sideways. Mobile URP. |
+| 7 | Visual style | **2.5D, side-on broadcast camera** following the ball, played with the phone held sideways. **Stylised low-poly**, men's teams. Mobile URP. |
 | 8 | Audio and languages | Generic crowd noise plus a referee's whistle. No music or chants. **English and French only.** Available worldwide so the diaspora can play, but focused on Africa (see §8). |
 | 9 | Running cost | £0. The only unavoidable cost is Google Play's one-off developer registration fee, if not already paid. |
 | 10 | Ownership | Company Play developer account (organisation account, which needs a free D-U-N-S number) and company AdMob account. |
@@ -168,6 +168,38 @@ A person's AI teammates always play at Medium.
 
 A Medium win with two goals pays (20 + 20 + 30) × 1.5 = 105 coins, so a common item takes about
 2 matches and a pitch about 15. That matches the "steady" pace.
+
+---
+
+## 3b. Art and audio
+
+**Status: confirmed by owner (Part 8).**
+
+- **Style:** stylised low-poly. Chunky, colourful, slightly exaggerated footballers with flat
+  shading. Readable side-on on a small screen and light on cheap phones.
+- **Players:** men's teams.
+- **Pitches:** one per country, all walled to match the cage rule. Any player can unlock any of
+  them, whatever country they chose.
+
+| Pitch | Country | How to get it |
+|---|---|---|
+| Lagos street cage | Nigeria | Free from the start |
+| Accra beach | Ghana | Shop |
+| Nairobi rooftop | Kenya | Shop |
+| Dakar sand court | Senegal | Shop |
+| Abidjan market court | Côte d'Ivoire | Shop |
+| Douala school field | Cameroon | Shop |
+
+- **Match audio:** generic crowd noise reacting to play (rising on attacks, roaring on goals), a
+  referee's whistle (kick-off, goals, full time), ball kicks and wall thuds. No commentary, music
+  or chants.
+- **Menu audio:** ambient street sounds (distant traffic, a ball against a wall, faint crowd). No
+  music.
+- **Sourcing at £0:** free asset packs that need no credit (CC0, e.g. Kenney, Quaternius,
+  freesound.org CC0 sounds), plus free Mixamo animations (royalty-free for games through a free
+  Adobe account, though not CC0). I customise, recolour and assemble them, and build simple
+  models (walls, goals, props) in code. Every asset's licence is recorded in `CREDITS.md`, so we
+  can show none needs payment. Paid art can replace any of it later.
 
 ---
 
