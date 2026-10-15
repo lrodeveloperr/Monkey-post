@@ -249,6 +249,47 @@ retired Play Games real-time multiplayer in 2020, and any replacement needs a se
 
 ---
 
+## 5a. Google Play Games
+
+**Status: confirmed by owner (Part 7).**
+
+- **Sign-in:** automatic and fully optional. If the player already uses Play Games it signs in
+  silently. Otherwise the game works fully without it, and settings has a "Sign in to back up
+  progress" button.
+- **Cloud save (Saved Games):** coins, unlocks, own team and stats. If the phone and cloud copies
+  differ, the game **keeps the most progress** automatically: unlocked items are combined, and coins
+  and stats come from whichever save has earned more in total. No prompts.
+- **Leaderboards** (Play Games provides daily, weekly and all-time views automatically):
+  total goals scored, cups won, Hard cups won, and longest win streak vs bots.
+- **Achievements:** about 20 at launch (draft below, for review). Hidden ones are marked *(hidden)*.
+
+| # | Achievement | How to get it |
+|---|---|---|
+| 1 | Full Time | Finish your first match |
+| 2 | Off the Mark | Score your first goal |
+| 3 | First Win | Win a match |
+| 4 | Hat-trick | One player scores 3 goals in a match |
+| 5 | Clean Sheet | Win without conceding |
+| 6 | Thrashing | Win by 5 or more goals |
+| 7 | Comeback | Win after being 2 goals down |
+| 8 | Golden Goal | Win a match with a golden goal |
+| 9 | Street Champions | Win the Easy cup |
+| 10 | Local Legends | Win the Medium cup |
+| 11 | Kings of the Street | Win the Hard cup |
+| 12 | Giant Killer | Beat a Hard team in a quick match |
+| 13 | Long Range | Score from your own half |
+| 14 | Just Under | Score a shot that crosses the line just under knee height |
+| 15 | Brick Wall | Win 5 tackles in one match |
+| 16 | Neighbours | Play your first local 1v1 |
+| 17 | Bragging Rights | Win a local 1v1 |
+| 18 | One More! | Play 3 rematches in a row |
+| 19 | Shopper | Buy your first shop item |
+| 20 | Collector | Unlock every ball |
+| 21 | Wrong End *(hidden)* | Score an own goal |
+| 22 | Last Gasp *(hidden)* | Score in the final 5 seconds to win |
+
+---
+
 ## 6. Ads
 
 **Status: confirmed by owner (Part 6).**
