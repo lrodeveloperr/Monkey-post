@@ -44,16 +44,24 @@ fouls, computer-controlled keeper, 1.8 m goals and keeper staying in the box wer
 | Clock | **4 minutes**, one period, then the final whistle | Short mobile session. A draw is a draw. |
 | Kick-off | At the start, and by the conceding team after each goal | |
 
-**Controls (person):**
-- Virtual joystick to move, a sprint button (stamina bar).
-- **Pass**: to the teammate in the joystick direction.
-- **Shoot**: hold to charge power, joystick up or down to aim across the goal. Too much power from
-  mid-range flies over knee height.
-- **Tackle**: when not on the ball. Well-timed tackles from the front win it; misses stun you.
-- **Switch**: jump to another teammate. Control also moves automatically to whoever is closest to
-  the ball, or to whoever receives a pass.
-- The keeper is always bot-controlled. With feet-only keepers that keeps play simple, and the
-  keeper clears the ball quickly when they win it.
+**Controls and camera — status: confirmed by owner (Part 2).**
+
+Layout: **virtual joystick** under the left thumb, **three buttons** under the right thumb.
+
+| Button | With the ball | Without the ball |
+|---|---|---|
+| A | **Pass** to the teammate in the joystick direction | **Switch** to another teammate |
+| B | **Shoot**: hold to charge (power bar), let go to shoot; joystick up or down aims across the goal | **Tackle** |
+| Sprint | Hold to sprint (drains the stamina bar) | Same |
+
+- Too much shot power from mid-range flies over knee height. The power bar marks the "safe" zone
+  for the current distance.
+- Control moves automatically to the ball carrier, or to whoever is closest to a loose or
+  opponent's ball. Switch overrides it.
+- The keeper is always computer-controlled and clears the ball quickly when they win it.
+- **Camera:** side-on, **follows the ball** showing about half the pitch, with a slight zoom near
+  goal.
+- **Haptics:** light buzzes on goals, tackles and full-power shots, with an off switch in settings.
 
 All numbers live in `MatchConfig` and will be tuned from playtests.
 
