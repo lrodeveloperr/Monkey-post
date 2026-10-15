@@ -22,7 +22,7 @@ a fast 5-a-side version: 4 outfield players and a keeper who may only use their 
 | 7 | Visual style | **2.5D, side-on broadcast camera** following the ball, played with the phone held sideways. **Stylised low-poly**, men's teams. Mobile URP. |
 | 8 | Audio and languages | Generic crowd noise plus a referee's whistle. No music or chants. **English and French only.** Available worldwide so the diaspora can play, but focused on Africa (see §8). |
 | 9 | Running cost | £0. The only unavoidable cost is Google Play's one-off developer registration fee, if not already paid. |
-| 10 | Ownership | Company Play developer account (organisation account, which needs a free D-U-N-S number) and company AdMob account. |
+| 10 | Ownership | **Worksbien Studios Inc.** Company Play developer account (organisation account, which needs a free D-U-N-S number) and company AdMob account. |
 | 11 | Build process | Claude builds, owner reviews every PR. |
 | 12 | v1 scope | **Offline vs bots + local 1v1 via Nearby Connections** (one phone per team, same room, no internet). |
 | 13 | Single-player | **Quick match + 8-team street cup.** The player picks the difficulty, chooses a country (which sets the opponent teams) and customises their own team. |
@@ -241,6 +241,25 @@ A Medium win with two goals pays (20 + 20 + 30) × 1.5 = 105 coins, so a common 
 | Haptics | On / off |
 | Play Games | Sign in to back up progress / sign out |
 | Privacy | Ad consent options (UMP), privacy policy link |
+
+---
+
+## 3e. Branding, store listing and legal
+
+**Status: confirmed by owner (Part 12).**
+
+| Item | Value |
+|---|---|
+| Publisher (Play developer name) | **Worksbien Studios Inc.** |
+| App name on Play | **Monkey Post: Street Football** |
+| Store listing languages | English and French |
+| Support email (public on the store) | **info@worksbienstudios.com** |
+| Website | The company's existing website (assumed `worksbienstudios.com`, to confirm) |
+| Privacy policy | A page on the company website, e.g. `worksbienstudios.com/monkeypost/privacy` |
+| app-ads.txt | Must be at the **root** of the domain listed on the store: `worksbienstudios.com/app-ads.txt` |
+
+Claude drafts the privacy policy (English and French) and the app-ads.txt contents. The company
+adds them to its website.
 
 ---
 
@@ -476,9 +495,12 @@ Organisation accounts are currently exempt, but check this in Play Console at th
 
 ---
 
-## 12. Open questions for the owner
+## 12. Open items for the owner
 
-- Name and branding of the company account (for the store listing and privacy policy).
-- Art direction for the footballers and pitch: e.g. a Lagos street cage, a dusty school field,
-  a beach pitch. These could double as unlockable pitches.
-- Whether to add an optional golden-goal decider for draws later.
+All 12 decision areas are confirmed. Remaining practical items:
+
+- Confirm the website domain (assumed `worksbienstudios.com`) and that pages and a root-level
+  `app-ads.txt` can be added to it.
+- Get a D-U-N-S number for Worksbien Studios Inc. (free) if the Play organisation account doesn't
+  have one yet.
+- Line up the native French speaker for the string review before launch.
