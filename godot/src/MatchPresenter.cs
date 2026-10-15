@@ -1,6 +1,6 @@
+using Godot;
 using MonkeyPost.Core;
 using MonkeyPost.Core.Bots;
-using UnityEngine;
 
 namespace MonkeyPost.Game
 {
@@ -38,30 +38,30 @@ namespace MonkeyPost.Game
 
         LocalMatch _match;
         PlayerInput _pending;
-        float _safePowerDistance = -1f;
-        float _safePower = 1f;
         float _accumulator;
         float _cameraX;
+        float _safePowerDistance = -1f;
+        float _safePower = 1f;
 
         public MatchSimulation Simulation => _match?.Simulation;
         public BotDifficulty Difficulty { get; private set; }
         public string OpponentName { get; private set; } = "";
         public float GoalBanner { get; private set; }
         public int LastGoalTeam { get; private set; } = -1;
-
-        /// <summary>Text and time left for a skill-move banner ("NUTMEG!"), or null.</summary>
         public string SkillBanner { get; private set; }
         public float SkillBannerTime { get; private set; }
         public bool Finished => _match != null && _match.Simulation.Phase == Phase.Ended;
+        public bool UsingRiggedCharacters { get; }
 
-        public MatchPresenter(MatchConfig config, Transform parent)
+        public MatchPresenter(MatchConfig config, Node3D parent)
         {
             _config = config;
-            var root = new GameObject("Match").transform;
-            root.SetParent(parent, false);
+            var root = new Node3D { Name = "Match" };
+            parent.AddChild(root);
 
             // Rigged, animated characters once the art is imported; primitive placeholders until then.
-            var library = new AnimationLibrary();
+            var assets = CharacterAssets.Load();
+            UsingRiggedCharacters = assets != null;
             for (int id = 0; id < MatchSimulation.PlayerCount; id++)
             {
                 int team = MatchSimulation.TeamOf(id);
@@ -69,27 +69,27 @@ namespace MonkeyPost.Game
                 bool keeper = slot == 0;
                 var kit = team == 0 ? (keeper ? HomeKeeper : HomeKit) : (keeper ? AwayKeeper : AwayKit);
                 var shorts = team == 0 ? HomeShorts : AwayShorts;
-                if (library.Available)
+                if (assets != null)
                 {
-                    var skin = library.Skins.Length > 0 ? library.Skins[id % library.Skins.Length] : null;
                     int number = keeper ? 1 : slot + (team == 0 ? 1 : 5);
-                    _footballers[id] = new RiggedFootballer(root, $"Player {id}", library, kit, skin, number, keeper,
+                    _footballers[id] = new RiggedFootballer(root, $"Player{id}", assets, kit, assets.Skin(id), number, keeper,
                         config.JogSpeed, config.SprintSpeed);
                 }
                 else
                 {
-                    _footballers[id] = new FootballerView(root, $"Player {id}", kit, shorts, SkinTones[id % SkinTones.Length]);
+                    _footballers[id] = new PrimitiveFootballer(root, $"Player{id}", kit, shorts, SkinTones[id % SkinTones.Length]);
                 }
             }
             _ball = new BallView(root);
             _cameraX = config.PitchLength / 2f;
         }
 
-        public void StartMatch(BotDifficulty difficulty, ulong seed)
+        /// <param name="demo">Computer v computer (attract mode and automated checks): the home team is a bot too.</param>
+        public void StartMatch(BotDifficulty difficulty, ulong seed, bool demo = false)
         {
             Difficulty = difficulty;
             OpponentName = TeamNames.Pick(seed);
-            _match = new LocalMatch(_config, home: null, away: difficulty, seed: seed);
+            _match = new LocalMatch(_config, home: demo ? difficulty : (BotDifficulty?)null, away: difficulty, seed: seed);
             _pending = default;
             _accumulator = 0f;
             GoalBanner = 0f;
@@ -105,7 +105,7 @@ namespace MonkeyPost.Game
             {
                 if (_match == null) return false;
                 int owner = _match.Simulation.Ball.Owner;
-                return owner >= 0 && owner == _match.ControlledPlayer(HumanTeam);
+                return owner >= 0 && _match.IsHuman(HumanTeam) && owner == _match.ControlledPlayer(HumanTeam);
             }
         }
 
@@ -149,7 +149,7 @@ namespace MonkeyPost.Game
             _accumulator += Mathf.Min(dt, 0.25f);
             while (_accumulator >= TickSeconds && !Finished)
             {
-                _match.SetInput(HumanTeam, _pending);
+                if (_match.IsHuman(HumanTeam)) _match.SetInput(HumanTeam, _pending);
                 _match.Tick(TickSeconds);
                 Capture();
                 AnimateTouches();
@@ -186,7 +186,7 @@ namespace MonkeyPost.Game
                 var p = sim.Players[id];
                 if (p.TouchSerial == _touchSerials[id]) continue;
                 _touchSerials[id] = p.TouchSerial;
-                var point = Art.ToWorld(p.LastTouchPoint.XY, p.LastTouchPoint.Z);
+                var point = Art.ToWorld(p.LastTouchPoint);
                 var direction = Art.ToWorld(p.LastTouchDirection);
                 _footballers[id].OnTouch(p.LastTouchKind, point, direction);
             }
@@ -225,13 +225,13 @@ namespace MonkeyPost.Game
             {
                 _previous[id] = _current[id];
                 _current[id] = Art.ToWorld(sim.Players[id].Position);
-                if ((_current[id] - _previous[id]).sqrMagnitude > SnapDistance * SnapDistance) _previous[id] = _current[id];
+                if ((_current[id] - _previous[id]).LengthSquared() > SnapDistance * SnapDistance) _previous[id] = _current[id];
             }
             _ballPrevious = _ballCurrent;
             _ballHeightPrevious = _ballHeightCurrent;
             _ballCurrent = Art.ToWorld(sim.Ball.Position);
             _ballHeightCurrent = sim.Ball.Height;
-            if ((_ballCurrent - _ballPrevious).sqrMagnitude > SnapDistance * SnapDistance)
+            if ((_ballCurrent - _ballPrevious).LengthSquared() > SnapDistance * SnapDistance)
             {
                 _ballPrevious = _ballCurrent;
                 _ballHeightPrevious = _ballHeightCurrent;
@@ -239,26 +239,26 @@ namespace MonkeyPost.Game
         }
 
         /// <summary>Draws footballers, ball and camera, interpolated between the last two ticks.</summary>
-        public void Render(Camera camera, float dt)
+        public void Render(Camera3D camera, float dt, double time)
         {
             if (_match == null)
             {
-                PlaceCamera(camera, _cameraX + Mathf.Sin(Time.time * 0.15f) * 6f, dt);
+                PlaceCamera(camera, _config.PitchLength / 2f + Mathf.Sin((float)time * 0.15f) * 6f, dt);
                 return;
             }
 
             var sim = _match.Simulation;
-            float alpha = Mathf.Clamp01(_accumulator / TickSeconds);
+            float alpha = Mathf.Clamp(_accumulator / TickSeconds, 0f, 1f);
             int controlled = _match.ControlledPlayer(HumanTeam);
-            var ballPosition = Vector3.Lerp(_ballPrevious, _ballCurrent, alpha);
+            var ballPosition = _ballPrevious.Lerp(_ballCurrent, alpha);
             float ballHeight = Mathf.Lerp(_ballHeightPrevious, _ballHeightCurrent, alpha);
-            var ballCentre = ballPosition + Vector3.up * (ballHeight + _config.BallRadius);
+            var ballCentre = ballPosition + Vector3.Up * (ballHeight + _config.BallRadius);
             for (int id = 0; id < MatchSimulation.PlayerCount; id++)
             {
                 var p = sim.Players[id];
                 var pose = new FootballerPose
                 {
-                    Position = Vector3.Lerp(_previous[id], _current[id], alpha),
+                    Position = _previous[id].Lerp(_current[id], alpha),
                     Velocity = Art.ToWorld(p.Velocity),
                     Facing = new Vector2(p.Facing.X, p.Facing.Y),
                     Controlled = id == controlled,
@@ -274,19 +274,18 @@ namespace MonkeyPost.Game
             }
 
             _ball.Show(ballPosition, ballHeight, sim.Ball.Spin, dt);
-
-            PlaceCamera(camera, ballPosition.x, dt);
+            PlaceCamera(camera, ballPosition.X, dt);
         }
 
-        void PlaceCamera(Camera camera, float targetX, float dt)
+        void PlaceCamera(Camera3D camera, float targetX, float dt)
         {
             // Side-on broadcast view: follow the ball along the pitch, showing roughly half of it.
             const float halfView = 9f;
             float clamped = Mathf.Clamp(targetX, halfView, _config.PitchLength - halfView);
             _cameraX = Mathf.Lerp(_cameraX, clamped, 1f - Mathf.Exp(-4f * dt));
-            float midZ = _config.PitchWidth / 2f;
-            camera.transform.position = new Vector3(_cameraX, 13.5f, -9.5f);
-            camera.transform.LookAt(new Vector3(_cameraX, 0f, midZ - 1.5f));
+            float midY = _config.PitchWidth / 2f;
+            camera.Position = new Vector3(_cameraX, 13.5f, 9.5f);
+            camera.LookAt(Art.P(_cameraX, 0f, midY - 2.5f), Vector3.Up);
         }
     }
 }

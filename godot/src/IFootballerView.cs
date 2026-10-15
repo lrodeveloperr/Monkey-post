@@ -1,13 +1,14 @@
+using Godot;
 using MonkeyPost.Core;
-using UnityEngine;
 
 namespace MonkeyPost.Game
 {
-    /// <summary>Everything the match presenter tells a footballer's visuals each frame.</summary>
+    /// <summary>Everything the match presenter tells a footballer's visuals each frame (world space).</summary>
     struct FootballerPose
     {
         public Vector3 Position;
         public Vector3 Velocity;
+        /// <summary>Facing in pitch coordinates (X along, Y across).</summary>
         public Vector2 Facing;
         public bool Controlled;
         public bool Stunned;

@@ -28,3 +28,7 @@ local.properties
 .idea/
 .vs/
 .vscode/
+
+# Godot
+.godot/
+/build/

@@ -20,7 +20,7 @@ a fast 5-a-side version: 4 outfield players and a keeper who may only use their 
 | 4 | Match format | **5-a-side: 4 outfield + 1 feet-only keeper.** One 4-minute clock, no halves, no substitutes ("no bench"). Draws allowed. |
 | 5 | Pitch | **Walled cage**: the ball never goes out of play. No throw-ins, corners or goal kicks. |
 | 6 | Controls | A person controls **the whole team, with auto-switch** to the best-placed player (like FIFA / eFootball). Bots move their teammates. |
-| 7 | Visual style | **2.5D, side-on broadcast camera** following the ball, played with the phone held sideways. **Stylised low-poly**, men's teams. Mobile URP. |
+| 7 | Visual style | **2.5D, side-on broadcast camera** following the ball, played with the phone held sideways. **Stylised low-poly**, men's teams. Godot Compatibility renderer (runs on older phones). |
 | 8 | Audio and languages | Generic crowd noise plus a referee's whistle. No music or chants. **English only.** The concept is **Nigeria only for now**, but the app is listed worldwide so Nigerians abroad can play (see §8). |
 | 9 | Running cost | £0. The only unavoidable cost is Google Play's one-off developer registration fee, if not already paid. |
 | 10 | Ownership | **Worksbien Studios Inc.** Company Play developer account (organisation account, which needs a free D-U-N-S number) and company AdMob account. |
@@ -84,7 +84,7 @@ surface plays differently**, and **realistic momentum tuned to stay responsive**
 trajectory studies, sports-science sprint data). Every benchmark is enforced by a test. The full
 reference, with sources and measured results, is in [PHYSICS.md](PHYSICS.md).
 
-All of it lives in `core/` (pure C#, deterministic and unit-tested), not in Unity's physics engine.
+All of it lives in `core/` (pure C#, deterministic and unit-tested), not in the game engine's physics.
 That keeps the host-runs-the-match model of local 1v1 exact on every phone. The match steps at
 **60 Hz** and the ball at **240 Hz**, so even a 26 m/s shot can't pass through a leg or a post.
 
@@ -273,15 +273,15 @@ A person's AI teammates always play at Medium.
   keeper's stretch), the body leans into acceleration, and the head follows the ball.
 - **Kicks:** instant contact with a quick follow-through, no wind-up delay, so it stays
   responsive on a touchscreen.
-- **Model:** a free CC0 low-poly character (Kenney Animated Characters 2), Humanoid-retargeted.
-  One body with varied skins (skin tones and hairstyles). **Teams wear coloured street-football
-  bibs**, numbered on the back.
+- **Model:** a free CC0 low-poly character (Kenney Animated Characters 2), rigged with Mixamo's
+  free auto-rigger so it shares the clips' skeleton. One body with varied skins (skin tones and
+  hairstyles). **Teams wear coloured street-football bibs**, numbered on the back.
 - **Reactions:** head in hands after a miss or a shot over the posts, fist clench after winning a
   tackle, stumble when tackled, a look back when nutmegged.
 - **Celebrations:** 2 free (Fist Pump, Arms Out) and 6 in the shop (Knee Slide, Street Dance,
   Salute, Backflip, Shush the Crowd, Take a Bow).
 - **Assets:** the owner downloads the model and about 18 clips (list and settings in
-  [ANIMATION_ASSETS.md](ANIMATION_ASSETS.md)). They import automatically (Humanoid, in place,
+  [ANIMATION_ASSETS.md](ANIMATION_ASSETS.md)). Godot imports them automatically (FBX, in place,
   looping by name). Until they're in, the primitive placeholder footballers are used, with the
   same kicks, reactions and celebrations done procedurally.
 
@@ -417,9 +417,9 @@ Claude drafts the privacy policy (English). The company adds it to its website.
 ## 4. Architecture
 
 ```
-┌───────────────────────────── Android phone (Unity 6 app) ──────────────────────────────┐
+┌───────────────────────────── Android phone (Godot 4 app) ──────────────────────────────┐
 │                                                                                         │
-│  Presentation (Unity, 2.5D URP,    ◄── snapshots ──   MonkeyPost.Core (pure C#)        │
+│  Presentation (Godot 4 C#, 2.5D,   ◄── snapshots ──   MonkeyPost.Core (pure C#)        │
 │  side-on camera)                                       • MatchSimulation (rules,        │
 │  Touch controls / UI / Audio        ── inputs ──►        ball physics)                  │
 │  Localization                                          • TeamBrain bots                 │
@@ -433,8 +433,8 @@ Claude drafts the privacy policy (English). The company adds it to its website.
 ```
 
 ### Core rules package (`core/`)
-- Pure C#, **no Unity references**. It's a Unity package (UPM) and is also compiled and
-  unit-tested with `dotnet test` in CI.
+- Pure C#, **no engine references**. The Godot project compiles the same source files, and
+  they're unit-tested with `dotnet test` in CI.
 - Fixed 60 Hz tick with the ball substepped at 240 Hz (see §2b).
 - Seeded randomness, so a match replays identically from its seed (useful for bug reports).
 
@@ -459,8 +459,8 @@ Claude drafts the privacy policy (English). The company adds it to its website.
   same connection; otherwise both go back to the menu.
 - No pausing in 1v1.
 - Works over Bluetooth / Wi-Fi with **no internet and no server**.
-- Unity has no official Nearby plugin, so we ship a small Kotlin Android library (AAR) that
-  wraps the Nearby Connections API and talks to Unity through `AndroidJavaProxy`.
+- Godot has no official Nearby plugin, so we ship a small Kotlin Godot Android plugin (AAR)
+  that wraps the Nearby Connections API and talks to the game through signals.
 
 ### No backend
 Nothing runs on any server we operate. Player progress and unlocks live on the device and in Play
@@ -606,7 +606,7 @@ policies.
 - Runs on 2 GB RAM Android Go phones. **Android 8.0+** (owner decision), 64-bit and 32-bit ARM.
 - **Test device:** a cheap/older phone (e.g. a 2–3 GB Tecno, Infinix or Itel). If it's smooth there,
   it's smooth everywhere.
-- 30 fps cap, URP mobile, baked lighting, under 5k triangles per footballer (10 on screen).
+- 30 fps cap, Godot Compatibility renderer, simple lighting, under 5k triangles per footballer (10 on screen).
 - Base download under 60 MB.
 - Simulation tick 60 Hz (ball 240 Hz). Rendering capped at 30 fps. Local 1v1 snapshots 15 Hz,
   each a few hundred bytes (10 players + ball).
@@ -617,29 +617,33 @@ policies.
 
 ```
 docs/DESIGN.md                 this document
-core/                          MonkeyPost.Core Unity package (pure C#, no engine refs)
+core/                          MonkeyPost.Core (pure C#, no engine refs)
   Runtime/                     rules, ball physics, bots, snapshots, local match
 dotnet/                        .NET projects that compile core/ for tests and CI
   MonkeyPost.Core.csproj
   MonkeyPost.Core.Tests/       xunit tests, including bot-vs-bot balance runs
-unity/                         Unity 6 project (6000.0 LTS); builds itself from code
+godot/                         Godot 4.7 C# project; builds the scene from code
+  assets/                      footballer model, skins and Mixamo clips (owner-supplied)
 android/nearby-bridge/         Kotlin AAR wrapping Nearby Connections (milestone 3)
 ```
 
 Run the tests with `dotnet test dotnet/MonkeyPost.Core.Tests`.
 
-**Builds (owner decision):** every push builds an APK on GitHub Actions (GameCI, free Unity
-Personal). The owner downloads it from the Actions tab and installs it on the test phone. No local
-Unity install is needed. One-off licence setup and install steps: [BUILDING.md](BUILDING.md).
+**Engine (owner decision):** Godot 4 with C#, free and open source, so there are no licence
+fees or revenue thresholds. (Unity was used first and dropped to keep costs at £0.)
+
+**Builds (owner decision):** APKs are built on GitHub Actions on demand (Godot's free export
+templates, no secrets). The owner downloads it from the Actions tab and installs it on the test
+phone. No local install is needed. Steps: [BUILDING.md](BUILDING.md).
 
 ---
 
 ## 11. Milestones
 
 1. **Rules engine + bots** (pure C#, unit-tested). ✓
-2. Unity project: 2.5D cage pitch, side-on camera, footballers, touch controls, offline match vs
+2. Godot project: 2.5D cage pitch, side-on camera, footballers, touch controls, offline match vs
    bots, full-time screen. ← **playable prototype with placeholder art built from primitives**;
-   the CC0 low-poly art, URP and remaining screens follow.
+   the CC0 low-poly art and remaining screens follow.
 3. Nearby Connections bridge + local 1v1 lobby (host / join).
 4. Play Games Services: sign-in, achievements, leaderboards, Saved Games.
 5. Coins and shop (kits, badges, balls, pitches, celebrations), cup-winner items, AdMob + UMP,

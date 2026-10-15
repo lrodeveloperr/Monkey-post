@@ -1,0 +1,14 @@
+<Project Sdk="Godot.NET.Sdk/4.7.2">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <!-- Godot's Android export template runs .NET 9. -->
+    <TargetFramework Condition=" '$(GodotTargetPlatform)' == 'android' ">net9.0</TargetFramework>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <RootNamespace>MonkeyPost.Game</RootNamespace>
+    <Nullable>disable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- The engine-independent rules, physics and bots, shared with the tests. -->
+    <Compile Include="../core/Runtime/**/*.cs" LinkBase="core" />
+  </ItemGroup>
+</Project>

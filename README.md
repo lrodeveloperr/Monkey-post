@@ -5,8 +5,9 @@ can only use their feet. Play against bots offline, or 1v1 with a friend in the 
 Bluetooth / Wi-Fi using Google's Nearby Connections. No servers, no running costs.
 
 - **Design and decisions:** [docs/DESIGN.md](docs/DESIGN.md)
-- **Rules, ball physics and bots:** [`core/`](core). Pure C#, used by the Unity app as a package.
-- **Unity app:** [`unity/`](unity). Builds an APK on every push; see [docs/BUILDING.md](docs/BUILDING.md).
+- **Rules, ball physics and bots:** [`core/`](core). Pure C#, engine-independent and unit-tested.
+- **Game app:** [`godot/`](godot). Godot 4.7 (C#), free and open source. Android APKs are built
+  on demand on GitHub Actions; see [docs/BUILDING.md](docs/BUILDING.md).
 
 ## Run the tests
 

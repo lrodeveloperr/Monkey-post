@@ -1,7 +1,8 @@
 name: Android build
 
 # On demand only (Actions tab -> Android build -> Run workflow), so a private repository stays
-# well inside GitHub's 2,000 free Actions minutes a month. Each build takes ~20-60 minutes.
+# well inside GitHub's 2,000 free Actions minutes a month. A build takes about 5-10 minutes.
+# Godot is free and open source: no licence, account or secrets are needed.
 on:
   workflow_dispatch:
 
@@ -9,67 +10,82 @@ concurrency:
   group: android-build-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  GODOT_VERSION: 4.7.2
+
 jobs:
   build:
     name: Build APK
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 30
     steps:
-      - name: Check Unity licence secrets
-        id: licence
-        env:
-          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
-          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
-          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
-        run: |
-          if [ -z "$UNITY_LICENSE" ] || [ -z "$UNITY_EMAIL" ] || [ -z "$UNITY_PASSWORD" ]; then
-            echo "available=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::Unity licence secrets are not set yet, so the APK build is skipped. See docs/BUILDING.md."
-          else
-            echo "available=true" >> "$GITHUB_OUTPUT"
-          fi
-
       - uses: actions/checkout@v4
-        if: steps.licence.outputs.available == 'true'
 
-      # The Unity Android image is large; make room on the runner.
-      - name: Free disk space
-        if: steps.licence.outputs.available == 'true'
-        uses: jlumbroso/free-disk-space@v1.3.1
+      - uses: actions/setup-dotnet@v4
         with:
-          tool-cache: false
-          android: true
-          dotnet: true
-          haskell: true
-          large-packages: false
-          docker-images: false
-          swap-storage: false
+          dotnet-version: |
+            8.0.x
+            9.0.x
 
-      - uses: actions/cache@v4
-        if: steps.licence.outputs.available == 'true'
+      - uses: actions/setup-java@v4
         with:
-          path: unity/Library
-          key: Library-Android-${{ hashFiles('unity/Packages/manifest.json', 'unity/ProjectSettings/ProjectVersion.txt', 'core/package.json') }}
-          restore-keys: Library-Android-
+          distribution: temurin
+          java-version: 17
 
-      - name: Build with Unity
-        if: steps.licence.outputs.available == 'true'
-        uses: game-ci/unity-builder@v4
-        env:
-          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
-          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
-          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
-        with:
-          projectPath: unity
-          targetPlatform: Android
-          buildName: MonkeyPost
-          buildMethod: MonkeyPost.EditorTools.BuildScript.BuildAndroid
-          allowDirtyBuild: true
+      - name: Install Godot and the Android export template
+        run: |
+          base="https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable"
+          mkdir -p ~/godot-download && cd ~/godot-download
+          curl -fsSL -o editor.zip "$base/Godot_v${GODOT_VERSION}-stable_mono_linux_x86_64.zip"
+          curl -fsSL -o templates.tpz "$base/Godot_v${GODOT_VERSION}-stable_mono_export_templates.tpz"
+          unzip -q editor.zip -d ~/godot
+          # Only the Android templates are needed; the full set is several GB unpacked.
+          unzip -q templates.tpz 'templates/android_*' 'templates/version.txt' -d ~/godot-templates
+          dest=~/.local/share/godot/export_templates/${GODOT_VERSION}.stable.mono
+          mkdir -p "$(dirname "$dest")" && mv ~/godot-templates/templates "$dest"
+          rm -f editor.zip templates.tpz
+          echo "GODOT=$HOME/godot/Godot_v${GODOT_VERSION}-stable_mono_linux_x86_64/Godot_v${GODOT_VERSION}-stable_mono_linux.x86_64" >> "$GITHUB_ENV"
+
+      # A throwaway debug key, made fresh each run. Play Store uploads will use the company's
+      # upload key instead (see docs/BUILDING.md).
+      - name: Make a debug signing key
+        run: |
+          keytool -genkeypair -keystore ~/debug.keystore -storepass android -alias androiddebugkey \
+            -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          {
+            echo "GODOT_ANDROID_KEYSTORE_DEBUG_PATH=$HOME/debug.keystore"
+            echo "GODOT_ANDROID_KEYSTORE_DEBUG_USER=androiddebugkey"
+            echo "GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD=android"
+          } >> "$GITHUB_ENV"
+
+      - name: Import the project
+        working-directory: godot
+        run: |
+          dotnet build
+          "$GODOT" --headless --path . --import
+
+      - name: Point Godot at the Android SDK and Java
+        run: |
+          settings=~/.config/godot/editor_settings-${GODOT_VERSION%.*}.tres
+          if [ ! -f "$settings" ]; then
+            mkdir -p "$(dirname "$settings")"
+            printf '[gd_resource type="EditorSettings" format=3]\n\n[resource]\n' > "$settings"
+          fi
+          echo "export/android/android_sdk_path = \"$ANDROID_HOME\"" >> "$settings"
+          echo "export/android/java_sdk_path = \"$JAVA_HOME\"" >> "$settings"
+
+      - name: Export APK
+        working-directory: godot
+        run: |
+          mkdir -p ../build
+          "$GODOT" --headless --path . --export-debug "Android" ../build/MonkeyPost.apk 2>&1 | tee ../build/export.log
+          test -s ../build/MonkeyPost.apk
 
       - name: Upload APK
-        if: steps.licence.outputs.available == 'true'
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: MonkeyPost-${{ github.run_number }}
-          path: build/Android
+          path: build/
           retention-days: 7
+          if-no-files-found: ignore

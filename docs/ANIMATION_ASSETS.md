@@ -15,36 +15,39 @@ commit. The folders already exist.
 
 ---
 
-## 1. The character model: Kenney "Animated Characters 2" (CC0, free)
+## 1. The character model: Kenney "Animated Characters 2" (CC0, free) rigged by Mixamo
+
+The model and the clips must share one skeleton, so the model goes through Mixamo's free
+auto-rigger first.
 
 1. Go to <https://kenney.nl/assets/animated-characters-2> and download it. Donating is optional;
    choose the free option.
-2. From the zip:
-   - Upload `Model/characterMedium.fbx` to **`unity/Assets/Resources/Characters/`** and **rename
-     it `Footballer.fbx`** (rename it before uploading).
-   - Upload the **male** skin images from `Skins/` (the `.png` files) to
-     **`unity/Assets/Resources/Characters/Skins/`**. The game gives each player a different one,
-     for varied skin tones and hairstyles.
-
-If the build log later says the model "is not a valid humanoid", there's a fallback: upload
-`characterMedium.fbx` to Mixamo (**Upload Character**), let it auto-rig, then download it
-(*FBX for Unity, With Skin*) and use that file as `Footballer.fbx` instead.
+2. Go to <https://www.mixamo.com>, sign in with a free Adobe account, click **Upload Character**
+   and upload `Model/characterMedium.fbx` from the Kenney zip. Place the markers (chin, wrists,
+   elbows, knees, groin) when asked and let it auto-rig.
+3. With that character still selected, click **Download**: Format **FBX Binary (.fbx)**, Pose
+   **T-pose**. **Rename the file `Footballer.fbx`** and upload it to
+   **`godot/assets/characters/`**.
+4. Upload the **male** skin images from the Kenney zip's `Skins/` folder to
+   **`godot/assets/characters/skins/`**, renamed **`skin_1.png`, `skin_2.png`, …** in any order.
+   The game gives each player a different one, for varied skin tones and hairstyles.
 
 ---
 
-## 2. The clips: Mixamo (free, needs a free Adobe account)
+## 2. The clips: Mixamo
 
-Go to <https://www.mixamo.com>, sign in, and for each clip below:
+Keep the uploaded Kenney character selected on Mixamo (so every clip uses its skeleton), and for
+each clip below:
 
 1. Search for it. The search terms are suggestions: pick the closest-looking match.
 2. Click **Download** with these settings:
-   - Format: **FBX for Unity (.fbx)**
+   - Format: **FBX Binary (.fbx)**
    - Skin: **Without Skin**
    - Frames per second: **30**
    - Keyframe reduction: **none**
    - If there's an **In Place** checkbox, **tick it**.
 3. **Rename the file exactly as in the "File name" column** and upload it to
-   **`unity/Assets/Resources/Animations/`**.
+   **`godot/assets/animations/`**.
 
 The file name is what matters: the game finds clips by name, and names starting with `Loop_`
 loop automatically.
@@ -89,6 +92,7 @@ animated by the physics, so the foot always meets the ball exactly where it real
 
 ## 3. Done
 
-Once the files are pushed, the next APK build uses the real characters automatically. Tell
+Once the files are pushed, the next APK build uses the real characters automatically (Godot
+imports FBX files directly; nothing else to install). Tell
 Claude, and it will check the build log for import problems and tune the clip speeds so the feet
 don't slide.

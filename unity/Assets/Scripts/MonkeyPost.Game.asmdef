@@ -1,9 +1,0 @@
-{
-  "name": "MonkeyPost.Game",
-  "rootNamespace": "MonkeyPost.Game",
-  "references": ["MonkeyPost.Core"],
-  "includePlatforms": [],
-  "excludePlatforms": [],
-  "allowUnsafeCode": false,
-  "autoReferenced": true
-}

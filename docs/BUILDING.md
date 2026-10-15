@@ -1,43 +1,22 @@
 # Building and installing Monkey Post
 
-Android APKs are built on GitHub Actions using the free **Unity Personal** licence. You don't
-need to install the Unity editor. There's a one-off licence setup first.
+The game is made with **Godot 4.7** (C#), which is free and open source (MIT licence): no
+account, licence, fees or revenue thresholds. Android APKs are built on GitHub Actions, so you
+don't need to install anything. There's no setup and no secrets to add.
 
-**Cost: £0.** Unity Personal is free while the company's revenue and funding stay under Unity's
-threshold (currently $200,000 a year). GitHub gives private repositories 2,000 free Actions
-minutes a month; builds are **on demand only** (each takes about 20–60 minutes) so that allowance
-isn't used up. If it ever were, GitHub simply pauses builds until next month; with no payment
-method on the account, nothing can be charged.
+**Cost: £0.** GitHub gives private repositories 2,000 free Actions minutes a month. Builds are
+**on demand only** (each takes about 5–10 minutes), so that allowance won't run out. If it ever
+did, GitHub simply pauses builds until next month; with no payment method on the account,
+nothing can be charged.
 
-## One-off: connect your Unity licence (about 10 minutes)
-
-1. Create a free Unity account at <https://id.unity.com> if you don't have one. Use the company
-   account; Unity Personal is free while revenue and funding stay under Unity's threshold.
-2. Install **Unity Hub** (just the Hub, not the editor): <https://unity.com/download>.
-3. Sign in to Unity Hub, then go to **Preferences → Licenses → Add → Get a free personal licence**.
-   Click **Add** even if a licence already shows; that step creates the licence file.
-4. Find the licence file:
-   - Windows: `C:\ProgramData\Unity\Unity_lic.ulf`
-   - Mac: `/Library/Application Support/Unity/Unity_lic.ulf`
-
-   These folders may be hidden; turn on "show hidden files".
-5. On GitHub, open the repository → **Settings → Secrets and variables → Actions → New repository
-   secret**, and add three secrets:
-
-   | Name | Value |
-   |---|---|
-   | `UNITY_LICENSE` | The entire contents of `Unity_lic.ulf` (open it in Notepad / TextEdit, copy all) |
-   | `UNITY_EMAIL` | Your Unity account email |
-   | `UNITY_PASSWORD` | Your Unity account password |
-
-Until these exist, the "Android build" workflow skips the build with a warning instead of failing.
+The APK is signed with a throwaway debug key, which is fine for testing on your own phone. Play
+Store uploads (an `.aab` signed with the company's upload key) are added at the store milestone.
 
 ## Getting the APK
 
 1. On GitHub, open the **Actions** tab → **Android build** → the latest run.
-2. When it's green (the first build takes 30–60 minutes; later ones are faster thanks to
-   caching), download the **MonkeyPost-…** artifact at the bottom of the page. It's a zip
-   containing `MonkeyPost.apk`.
+2. When it's green (about 5–10 minutes), download the **MonkeyPost-…** artifact at the bottom
+   of the page. It's a zip containing `MonkeyPost.apk`.
 3. Copy the APK to the phone (or download it there), open it, and allow "install unknown apps"
    when Android asks. Installs from Play will replace this later.
 
@@ -57,9 +36,19 @@ kept for 7 days.
   far or near post. Without the ball, tap to tackle.
 - **II:** pause.
 
-In the Unity editor (optional): WASD/arrows to move, Shift to sprint, Space for pass/switch
+On a computer (optional): WASD/arrows to move, Shift to sprint, Space for pass/switch
 (double-tap for a through ball), K for shoot/tackle, 1/2/3/4 for nutmeg / drag-back / step-over
 left / right.
+
+## Running it on a computer (optional)
+
+Install the **.NET 8 SDK** and **Godot 4.7.2 .NET** (<https://godotengine.org/download>; the
+".NET" build), open `godot/project.godot` and press Play. The mouse works as a finger.
+For a computer-v-computer match from the command line:
+
+```sh
+godot --path godot -- --demo=Hard
+```
 
 ## Running the rules tests
 
