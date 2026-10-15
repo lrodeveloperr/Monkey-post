@@ -61,7 +61,7 @@ jobs:
       - name: Import the project
         working-directory: godot
         run: |
-          dotnet build
+          dotnet build MonkeyPost.csproj
           "$GODOT" --headless --path . --import
 
       - name: Point Godot at the Android SDK and Java
@@ -80,6 +80,11 @@ jobs:
           mkdir -p ../build
           "$GODOT" --headless --path . --export-debug "Android" ../build/MonkeyPost.apk 2>&1 | tee ../build/export.log
           test -s ../build/MonkeyPost.apk
+          # Godot still writes an APK when the C# part fails, but it wouldn't run. Fail instead.
+          if grep -E "ERROR: Export \.NET Project|ERROR: System\.|Project export for preset .* failed" ../build/export.log; then
+            echo "::error::The C# part of the export failed; see the lines above."
+            exit 1
+          fi
 
       - name: Upload APK
         if: always()
