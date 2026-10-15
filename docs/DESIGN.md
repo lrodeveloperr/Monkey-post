@@ -203,6 +203,28 @@ A Medium win with two goals pays (20 + 20 + 30) × 1.5 = 105 coins, so a common 
 
 ---
 
+## 3c. Menus and first-time experience
+
+**Status: confirmed by owner (Part 9).**
+
+**First launch:**
+1. **Country picker** (Nigeria, Ghana, Kenya, Cameroon, Senegal, Côte d'Ivoire). Shown in the
+   phone's language (English or French).
+2. **Guided first match** straight away: a short match against Easy bots with the default team,
+   with on-screen hints that appear as each action becomes useful (move, sprint, pass, shoot and
+   charge power, tackle, switch). It can be skipped.
+3. **Full-time screen: "Name your team!"** Name, kit colours and badge.
+4. Ad consent form (UMP), only for users in regions that require it, then the home screen.
+   No ads are shown before this point anyway (no interstitials in the first 3 matches).
+
+**Home screen:**
+- One big **Play** button: a quick match at the last difficulty played.
+- Tiles: **Street Cup**, **Local 1v1**, **Shop**, **My Team**.
+- The player's team stands in its kit on the Lagos cage (or their chosen pitch) in the
+  background. Coins are shown top right, settings top left.
+
+---
+
 ## 4. Architecture
 
 ```
