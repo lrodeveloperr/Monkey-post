@@ -39,7 +39,7 @@ namespace MonkeyPost.Game
             return pivot;
         }
 
-        public void Show(Vector3 position, Vector2 facing, float speed, bool controlled, bool stunned, float dt)
+        public void Show(Vector3 position, Vector2 facing, float speed, bool controlled, bool stunned, bool stretching, float dt)
         {
             _root.localPosition = position;
             if (facing.sqrMagnitude > 0.01f)
@@ -53,7 +53,8 @@ namespace MonkeyPost.Game
             _phase += dt * (4f + speed * 1.6f);
             float swing = Mathf.Sin(_phase) * 40f * stride;
             _legLeft.localRotation = Quaternion.Euler(swing, 0f, 0f);
-            _legRight.localRotation = Quaternion.Euler(-swing, 0f, 0f);
+            // A keeper stretching to block shoots a leg out to the side.
+            _legRight.localRotation = stretching ? Quaternion.Euler(-20f, 0f, 65f) : Quaternion.Euler(-swing, 0f, 0f);
             _armLeft.localRotation = Quaternion.Euler(-swing * 0.8f, 0f, 0f);
             _armRight.localRotation = Quaternion.Euler(swing * 0.8f, 0f, 0f);
 

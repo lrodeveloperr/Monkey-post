@@ -9,7 +9,7 @@ namespace MonkeyPost.Core.Tests
 {
     public class BotMatchTests
     {
-        const float Dt = 1f / 30f;
+        const float Dt = 1f / 60f;
         const int Matches = 30;
 
         readonly ITestOutputHelper _output;
@@ -42,7 +42,7 @@ namespace MonkeyPost.Core.Tests
         static void Play(LocalMatch match, Dictionary<MatchEventType, int> counts)
         {
             var sim = match.Simulation;
-            for (int tick = 0; tick < 100_000 && sim.Phase != Phase.Ended; tick++)
+            for (int tick = 0; tick < 200_000 && sim.Phase != Phase.Ended; tick++)
             {
                 match.Tick(Dt);
                 AssertInvariants(sim);
@@ -61,7 +61,9 @@ namespace MonkeyPost.Core.Tests
                 Assert.InRange(p.Stamina, 0f, 1f);
                 if (p.IsKeeper) Assert.True(MatchSimulation.InKeeperBox(c, p.Team, p.Position), $"keeper {p.Id} left box at {p.Position}");
             }
-            Assert.InRange(sim.Ball.Position.X, 0f, c.PitchLength);
+            // After a goal the ball sits just over the line, in the goal.
+            float slack = sim.Phase == Phase.GoalScored || sim.Phase == Phase.Ended ? 1f : 0f;
+            Assert.InRange(sim.Ball.Position.X, -slack, c.PitchLength + slack);
             Assert.InRange(sim.Ball.Position.Y, 0f, c.PitchWidth);
             Assert.True(sim.Ball.Height >= 0f);
             Assert.InRange(sim.Ball.Owner, -1, MatchSimulation.PlayerCount - 1);
@@ -126,15 +128,17 @@ namespace MonkeyPost.Core.Tests
 
             for (int i = 0; i < 300 && sim.Phase != Phase.Ended; i++)
             {
-                // A person who just holds "run right".
+                // A person who just holds "run right". Control is decided from the state at the
+                // start of each tick, so compare against the carrier before the tick.
+                int carrier = sim.Ball.Owner;
                 match.SetInput(0, new PlayerInput { Move = new Vec2(1f, 0f) });
                 match.Tick(Dt);
 
                 int controlled = match.ControlledPlayer(0);
                 Assert.Equal(0, MatchSimulation.TeamOf(controlled));
                 Assert.NotEqual(0, MatchSimulation.SlotOf(controlled)); // never the keeper
-                if (sim.Ball.Owner >= 0 && MatchSimulation.TeamOf(sim.Ball.Owner) == 0 && !sim.Players[sim.Ball.Owner].IsKeeper)
-                    Assert.Equal(sim.Ball.Owner, match.ControlledPlayer(0));
+                if (carrier >= 0 && MatchSimulation.TeamOf(carrier) == 0 && !sim.Players[carrier].IsKeeper)
+                    Assert.Equal(carrier, controlled);
             }
         }
 

@@ -25,13 +25,21 @@ namespace MonkeyPost.Core
         /// <summary>Where across the goal mouth to aim: -1 one post, 0 the middle, +1 the other post.</summary>
         public float Aim;
 
-        /// <summary>Shot power 0..1. Too much from close range and the ball goes over.</summary>
+        /// <summary>Shot power 0..1. Too much and the ball goes over knee height.</summary>
         public float Power;
 
+        /// <summary>Outfield: tackle. Keeper: stretch a leg to block.</summary>
         public bool Tackle;
 
         /// <summary>Ask to control a different teammate. Handled by the controller, not the rules.</summary>
         public bool Switch;
+    }
+
+    public enum KickType
+    {
+        None,
+        Pass,
+        Shot,
     }
 
     public enum MatchEventType
@@ -44,6 +52,10 @@ namespace MonkeyPost.Core
         TackleMissed,
         Save,
         Block,
+        /// <summary>The ball hit a monkey post.</summary>
+        Post,
+        /// <summary>The ball hit the cage wall hard (for sound).</summary>
+        WallHit,
         /// <summary>Full time with the scores level in a cup tie: next goal wins.</summary>
         GoldenGoal,
         MatchEnded,
@@ -84,18 +96,41 @@ namespace MonkeyPost.Core
         public float StunTime;
         public float KickCooldown;
         public float TackleCooldown;
+        public float TouchCooldown;
+
+        /// <summary>The direction the player is asking to go this tick (touches follow it).</summary>
+        public Vec2 DesiredMove;
+
+        // A pass or shot waiting for the ball to come into reach.
+        public KickType PendingKick;
+        public float PendingAim;
+        public float PendingPower;
+        public Vec2 PendingDirection;
+        public float PendingTime;
+
+        // Keeper leg stretch.
+        public float StretchTime;
+        public Vec2 StretchDirection;
 
         public bool IsKeeper => Slot == 0;
     }
 
+    /// <summary>The ball. Physically free at all times; <see cref="Owner"/> is who is dribbling it.</summary>
     public sealed class BallState
     {
-        public Vec2 Position;
-        public Vec2 Velocity;
-        /// <summary>Height above the ground, for the 2.5D view and the knee-height goal rule.</summary>
-        public float Height;
-        public float VerticalVelocity;
+        public BallBody Body;
+        public float Radius = 0.11f;
+
         /// <summary>The player dribbling the ball, or -1 when it is loose.</summary>
         public int Owner = -1;
+
+        public Vec2 Position => Body.Centre.XY;
+        public Vec2 Velocity => Body.Velocity.XY;
+
+        /// <summary>Height of the bottom of the ball above the ground.</summary>
+        public float Height => Body.Centre.Z - Radius;
+
+        public float VerticalVelocity => Body.Velocity.Z;
+        public Vec3 Spin => Body.Spin;
     }
 }

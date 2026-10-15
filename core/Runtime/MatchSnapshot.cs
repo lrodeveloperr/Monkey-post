@@ -35,6 +35,8 @@ namespace MonkeyPost.Core
         public readonly Vec2 Position;
         public readonly Vec2 Velocity;
         public readonly float Height;
+        public readonly float VerticalVelocity;
+        public readonly Vec3 Spin;
         public readonly int Owner;
 
         public BallSnapshot(BallState b)
@@ -42,6 +44,8 @@ namespace MonkeyPost.Core
             Position = b.Position;
             Velocity = b.Velocity;
             Height = b.Height;
+            VerticalVelocity = b.VerticalVelocity;
+            Spin = b.Spin;
             Owner = b.Owner;
         }
     }

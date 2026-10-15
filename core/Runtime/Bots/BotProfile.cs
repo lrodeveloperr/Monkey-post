@@ -44,12 +44,12 @@ namespace MonkeyPost.Core.Bots
                 case BotDifficulty.Easy:
                     return new BotProfile
                     {
-                        DecisionInterval = 0.5f,
-                        ReactionSeconds = 0.35f,
-                        TackleChance = 0.3f,
+                        DecisionInterval = 0.6f,
+                        ReactionSeconds = 0.4f,
+                        TackleChance = 0.25f,
                         ShootRange = 9f,
-                        AimSmartness = 0.2f,
-                        PowerError = 0.15f,
+                        AimSmartness = 0.1f,
+                        PowerError = 0.2f,
                         PassVision = 0.3f,
                         KeeperAnticipation = 0f,
                     };

@@ -73,6 +73,74 @@ All numbers live in `MatchConfig` and will be tuned from playtests.
 
 ---
 
+## 2b. Physics
+
+**Status: confirmed by owner.** Goal: best-in-class football physics. Owner decisions: **free-ball
+dribbling with a touch assist**, **automatic curl and spin from how you strike it**, **each pitch
+surface plays differently**, and **realistic momentum tuned to stay responsive**.
+
+All of it lives in `core/` (pure C#, deterministic and unit-tested), not in Unity's physics engine.
+That keeps the host-runs-the-match model of local 1v1 exact on every phone. The match steps at
+**60 Hz** and the ball at **240 Hz**, so even a 26 m/s shot can't pass through a leg or a post.
+
+**The ball** (`BallPhysics`): a size 5 football, modelled as a hollow sphere.
+- In the air: gravity, quadratic **air drag with a drag crisis** (hard-hit balls meet relatively
+  less drag), **Magnus lift from spin** (curl, topspin dip, backspin float) and slow spin decay.
+- On the ground: a struck ball **skids, then friction locks its spin to a true roll** (a hollow
+  ball keeps 3/5 of its speed). Rolling resistance comes from the surface.
+- **Bounces, walls, posts and bodies** use impulses with friction at the contact point, so spin
+  and speed trade off: **backspin checks up, topspin kicks on**, and side-spin carries off the wall.
+- **The monkey posts** are physical cylinders: shots can come back off the post.
+
+**Surfaces** (`PitchSurface`):
+
+| Pitch | Roll | Bounce | Character |
+|---|---|---|---|
+| Lagos street cage (turf) | fast, true | medium | the reference pitch |
+| Ibadan school field (dusty earth) | slow | dead | bumpy |
+| Abuja estate court (asphalt) | quick | lively | |
+| Port Harcourt waterfront (concrete) | fastest | highest | |
+| Kano sand court | dies quickly | barely bounces | a little bumpy |
+| Enugu hillside (natural grass) | medium | medium | slightly uneven |
+
+**Kicking:**
+- Shots are planned with the real physics. **Aim towards a post and a softer shot curls in**, with
+  the launch direction corrected so the curl brings it on target. **Power shots get topspin and
+  dip.** Too much power still flies over knee height; the power bar's green zone comes from the
+  same physics, so it's always right.
+- **Accuracy:** harder is wilder, and a shot struck **off balance** (facing away) is weaker and wider.
+- **Passes** are weighted to arrive already rolling at a controllable pace (about 5 m/s), leading
+  a running teammate. Keepers clear firmly.
+- **Kick windows:** press pass or shoot as the ball is arriving and the player steps up and
+  strikes it first time (0.4 s window).
+
+**Dribbling and control:**
+- The ball **really leaves the foot on every touch**. Jogging keeps it close; **sprinting pushes it
+  further ahead**, so it's quicker but easier to nick. The **touch assist** gently steers the
+  ball towards the ideal spot ahead of the carrier (adjustable in config).
+- **First touch:** balls up to about 6 m/s are killed cleanly; faster or bouncing balls can run
+  away. **Above 15 m/s the ball deflects off the player instead.**
+- **Tackles:** timing matters. A ball between touches (away from the carrier's feet) is easier to
+  win; a missed tackle leaves the tackler stunned.
+
+**Players** (`PlayerMotion`):
+- Acceleration and braking take time, **turning circles widen with speed**, and a sharp change of
+  direction at speed means **planting and braking first**.
+- Players have **bodies**: they shoulder each other with real momentum, and the ball deflects off
+  them.
+- **The feet-only keeper** stretches a leg to block shots, comes off the line to narrow the angle,
+  always takes the first touch away from goal, and clears firmly.
+- **Goal credit:** a shot that deflects in off a defender or keeper is the shooter's goal.
+
+**Verified by tests** (47 in total, including): drag shortens a lofted ball; sidespin curls the
+correct way by 0.5–5 m; topspin lands short and backspin long; skid-to-roll keeps 3/5 speed;
+backspin checks up and topspin kicks on the bounce; concrete rolls and bounces furthest and sand
+least; planned curling shots arrive within 15 cm of aim; passes arrive at about 5 m/s; dribbled
+balls leave the foot but stay under control; sprinting pushes the ball further; fast balls deflect;
+slow balls are controlled; posts rebound; sprinting players plant before reversing.
+
+---
+
 ## 3. Single-player modes and bots
 
 **Status: confirmed by owner (Part 3).**
@@ -121,10 +189,10 @@ A person's AI teammates always play at Medium.
 
 | Match | Goals per 4-min match | Result |
 |---|---|---|
-| Easy v Easy | 2.9 | |
-| Medium v Medium | 3.6 | |
-| Hard v Hard | 5.2 | |
-| Hard v Easy | 5.1 | Hard won 25, drew 3, lost 2 |
+| Easy v Easy | 2.2 | |
+| Medium v Medium | 3.3 | |
+| Hard v Hard | 7.6 | |
+| Hard v Easy | 3.7 | Hard won 24, drew 5, lost 1 |
 
 ---
 
@@ -275,8 +343,7 @@ Claude drafts the privacy policy (English). The company adds it to its website.
 ### Core rules package (`core/`)
 - Pure C#, **no Unity references**. It's a Unity package (UPM) and is also compiled and
   unit-tested with `dotnet test` in CI.
-- Fixed 30 Hz tick, with ball physics substepped so hard shots can't pass through players.
-  The ball has height for the 2.5D view and the knee-height goal rule.
+- Fixed 60 Hz tick with the ball substepped at 240 Hz (see §2b).
 - Seeded randomness, so a match replays identically from its seed (useful for bug reports).
 
 ### Local 1v1 (Nearby Connections)
@@ -447,7 +514,8 @@ policies.
   it's smooth everywhere.
 - 30 fps cap, URP mobile, baked lighting, under 5k triangles per footballer (10 on screen).
 - Base download under 60 MB.
-- Simulation tick 30 Hz. Local 1v1 snapshots 15 Hz, each a few hundred bytes (10 players + ball).
+- Simulation tick 60 Hz (ball 240 Hz). Rendering capped at 30 fps. Local 1v1 snapshots 15 Hz,
+  each a few hundred bytes (10 players + ball).
 
 ---
 

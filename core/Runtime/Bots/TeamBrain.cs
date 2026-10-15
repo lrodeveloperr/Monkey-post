@@ -13,7 +13,7 @@ namespace MonkeyPost.Core.Bots
         const float PressureRadius = 2.5f;
         const float ArriveRadius = 2f;
         const float KeeperClaimRadius = 4f;
-        const float KeeperHoldSeconds = 0.6f;
+        const float KeeperHoldSeconds = 0.25f;
         const float MinPassDistance = 3f;
         const float MaxPassDistance = 20f;
         const float MinPassLaneClearance = 1.2f;
@@ -77,7 +77,7 @@ namespace MonkeyPost.Core.Bots
 
             var ball = view.Ball;
             if (ball.Owner == id) return OnBall(view, me, slot, decide);
-            if (me.IsKeeper) return Keeper(view, me);
+            if (me.IsKeeper) return Keeper(view, me, decide);
             if (ball.Owner >= 0 && MatchSimulation.TeamOf(ball.Owner) == Team) return Shape(me, slot, attacking: true);
             if (id == chaser) return Chase(view, me, decide);
             if (id == cover) return Cover(me);
@@ -92,7 +92,9 @@ namespace MonkeyPost.Core.Bots
                 if (_keeperHeldSince < 0f) _keeperHeldSince = _time;
                 if (_time - _keeperHeldSince < KeeperHoldSeconds) return default;
                 _keeperHeldSince = -1f;
-                int target = BestPassTarget(view, me, requireForward: false);
+                // Prefer an open teammate upfield; under pressure, any open one.
+                int target = BestPassTarget(view, me, requireForward: true);
+                if (target < 0) target = BestPassTarget(view, me, requireForward: false);
                 var direction = target >= 0
                     ? (view.Players[target].Position - me.Position).Normalized
                     : new Vec2(MatchSimulation.AttackDirection(Team), 0f);
@@ -193,26 +195,53 @@ namespace MonkeyPost.Core.Bots
             return best;
         }
 
-        PlayerInput Keeper(MatchSnapshot view, PlayerSnapshot me)
+        PlayerInput Keeper(MatchSnapshot view, PlayerSnapshot me, bool decide)
         {
             _keeperHeldSince = -1f;
             var goal = MatchSimulation.GoalCentre(_config, Team);
             var ball = PerceivedBall(_profile.KeeperAnticipation);
+            var ballVelocity = _seenBallVelocity;
+            float outward = MatchSimulation.AttackDirection(Team);
+            float maxSide = _config.GoalWidth * 0.5f + 0.5f;
 
             // Rush out to clear a loose ball in the box if nobody else will get there first.
             if (view.Ball.Owner < 0
                 && Vec2.Distance(me.Position, view.Ball.Position) < KeeperClaimRadius
-                && Vec2.Distance(me.Position, view.Ball.Position) < NearestOpponentDistance(view, view.Ball.Position))
+                && Vec2.Distance(me.Position, view.Ball.Position) < NearestOpponentDistance(view, view.Ball.Position)
+                && ballVelocity.Length < 6f)
             {
                 return new PlayerInput { Move = (view.Ball.Position - me.Position).Normalized, Sprint = true };
             }
 
-            // Otherwise stand on the line between ball and goal, close to the goal.
-            var toBall = ball - goal;
-            var spot = goal + toBall.Normalized * Math.Min(0.7f, toBall.Length * 0.1f);
-            float maxSide = _config.GoalWidth * 0.5f + 0.5f;
-            spot = new Vec2(spot.X, Math.Max(goal.Y - maxSide, Math.Min(goal.Y + maxSide, spot.Y)));
-            return Arrive(me, spot, sprintBeyond: 3f);
+            Vec2 spot;
+            bool shotIncoming = view.Ball.Owner < 0 && ballVelocity.X * -outward > 6f;
+            if (shotIncoming)
+            {
+                // Get across onto the line of the shot.
+                float lineX = goal.X + outward * 0.7f;
+                float time = (lineX - ball.X) / ballVelocity.X;
+                float crossingY = ball.Y + ballVelocity.Y * Math.Max(0f, time);
+                spot = new Vec2(lineX, Math.Max(goal.Y - maxSide, Math.Min(goal.Y + maxSide, crossingY)));
+            }
+            else
+            {
+                // Stand on the line between ball and goal. As a carrier closes in, come off the
+                // line to narrow the angle (the box stops the keeper going too far).
+                var toBall = ball - goal;
+                float distance = toBall.Length;
+                float off = distance < 9f ? Math.Min(2f, 0.7f + (9f - distance) * 0.25f) : Math.Min(0.7f, distance * 0.1f);
+                spot = goal + toBall.Normalized * Math.Min(off, Math.Max(0.8f, distance - 1.2f));
+                spot = new Vec2(spot.X, Math.Max(goal.Y - maxSide, Math.Min(goal.Y + maxSide, spot.Y)));
+            }
+
+            var input = Arrive(me, spot, sprintBeyond: 0.8f);
+            float ballDistance = Vec2.Distance(me.Position, view.Ball.Position);
+            // Feet only: stretch a leg at a shot that's about to arrive, or spread to block a
+            // carrier who's right on top of the keeper.
+            bool carrierClose = view.Ball.Owner >= 0 && MatchSimulation.TeamOf(view.Ball.Owner) != Team && ballDistance < 1.8f;
+            if (decide && ((shotIncoming && ballDistance < 2.5f) || (carrierClose && _rng.Chance(_profile.TackleChance))))
+                input.Tackle = true;
+            return input;
         }
 
         PlayerInput Chase(MatchSnapshot view, PlayerSnapshot me, bool decide)

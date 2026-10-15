@@ -1,3 +1,4 @@
+using MonkeyPost.Core;
 using UnityEngine;
 
 namespace MonkeyPost.Game
@@ -6,6 +7,7 @@ namespace MonkeyPost.Game
     {
         // Drawn larger than a real ball so it reads clearly from the side-on camera.
         const float VisualDiameter = 0.38f;
+        const float PhysicalRadius = 0.11f;
 
         readonly Transform _ball;
         readonly Transform _shadow;
@@ -17,19 +19,24 @@ namespace MonkeyPost.Game
             Art.Shape(PrimitiveType.Cube, "Panel", _ball, Vector3.zero, new Vector3(1.02f, 0.25f, 0.25f), new Color(0.1f, 0.1f, 0.1f));
         }
 
-        public void Show(Vector3 groundPosition, float height, Vector3 velocity, float dt)
+        /// <param name="spin">The ball's real angular velocity from the simulation (rad/s, pitch axes).</param>
+        public void Show(Vector3 groundPosition, float height, Vec3 spin, float dt)
         {
             _ball.localPosition = groundPosition + Vector3.up * (VisualDiameter / 2f + height);
             _shadow.localPosition = groundPosition + Vector3.up * 0.015f;
             float shadowScale = Mathf.Lerp(0.4f, 0.2f, Mathf.Clamp01(height / 2f));
             _shadow.localScale = new Vector3(shadowScale, 0.004f, shadowScale);
 
-            var flat = new Vector3(velocity.x, 0f, velocity.z);
-            float speed = flat.magnitude;
-            if (speed > 0.05f)
+            // Pitch axes (X along, Y across, Z up; right-handed) map to world (X, Z, Y). Swapping two
+            // axes mirrors the space, which reverses the sense of rotation.
+            float rate = spin.Length;
+            if (rate > 0.01f)
             {
-                var axis = Vector3.Cross(Vector3.up, flat / speed);
-                _ball.Rotate(axis, speed * dt / (VisualDiameter / 2f) * Mathf.Rad2Deg, Space.World);
+                var axis = new Vector3(spin.X, spin.Z, spin.Y) / rate;
+                // The drawn ball is bigger than a real one; scale the spin so its roll still
+                // matches its speed across the ground.
+                float visualRate = rate * PhysicalRadius / (VisualDiameter / 2f);
+                _ball.Rotate(axis, -visualRate * dt * Mathf.Rad2Deg, Space.World);
             }
         }
     }

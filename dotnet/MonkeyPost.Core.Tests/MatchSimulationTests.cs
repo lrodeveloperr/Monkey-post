@@ -6,7 +6,7 @@ namespace MonkeyPost.Core.Tests
 {
     public class MatchSimulationTests
     {
-        const float Dt = 1f / 30f;
+        const float Dt = 1f / 60f;
         const int HomeStriker = 4;
         const int HomeDefender = 1;
         const int AwayKeeper = 5;
@@ -42,7 +42,7 @@ namespace MonkeyPost.Core.Tests
         static void GiveBall(MatchSimulation sim, int id, Vec2 at, Vec2 facing)
         {
             sim.PlacePlayer(id, at, facing);
-            sim.PlaceBall(at + facing.Normalized * sim.Config.DribbleOffset, Vec2.Zero, owner: id);
+            sim.PlaceBall(at + facing.Normalized * 0.5f, Vec2.Zero, owner: id);
         }
 
         [Fact]
@@ -259,7 +259,7 @@ namespace MonkeyPost.Core.Tests
             inputs[1].Move = new Vec2(1f, 0f);
             inputs[2].Move = new Vec2(1f, 0f);
             inputs[2].Sprint = true;
-            for (int i = 0; i < 30; i++) Step(sim, inputs);
+            for (int i = 0; i < 120; i++) Step(sim, inputs);
 
             Assert.True(sim.Players[2].Position.X > sim.Players[1].Position.X + 1f);
             Assert.True(sim.Players[2].Stamina < sim.Players[1].Stamina);
@@ -270,7 +270,7 @@ namespace MonkeyPost.Core.Tests
         {
             var sim = new MatchSimulation(new MatchConfig { MatchDurationSeconds = 2f }, seed: 1);
             int ends = 0;
-            for (int i = 0; i < 120; i++)
+            for (int i = 0; i < 180; i++)
             {
                 Step(sim);
                 ends += sim.Events.Count(e => e.Type == MatchEventType.MatchEnded);
@@ -322,7 +322,7 @@ namespace MonkeyPost.Core.Tests
         public void MaxSafePower_PredictsWhetherAShotGoesOver(float powerOffset, bool expectGoal)
         {
             var sim = InPlay();
-            var ballStart = new Vec2(26f + sim.Config.DribbleOffset, 10f);
+            var ballStart = new Vec2(26.5f, 10f);
             float safe = ShotPhysics.MaxSafePower(sim.Config, sim.Config.PitchLength - ballStart.X);
             Assert.InRange(safe, 0.3f, 0.95f);
 

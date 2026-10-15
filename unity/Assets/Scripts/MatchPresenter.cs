@@ -5,13 +5,13 @@ using UnityEngine;
 namespace MonkeyPost.Game
 {
     /// <summary>
-    /// Runs a <see cref="LocalMatch"/> at a fixed 30 Hz and draws it smoothly at any frame rate by
+    /// Runs a <see cref="LocalMatch"/> at a fixed 60 Hz and draws it smoothly at any frame rate by
     /// interpolating between the last two ticks. The person always plays the home team.
     /// </summary>
     sealed class MatchPresenter
     {
         public const int HumanTeam = 0;
-        const float TickSeconds = 1f / 30f;
+        const float TickSeconds = 1f / 60f;
         const float SnapDistance = 3f;
         const float GoalBannerSeconds = 2.2f;
 
@@ -37,6 +37,8 @@ namespace MonkeyPost.Game
 
         LocalMatch _match;
         PlayerInput _pending;
+        float _safePowerDistance = -1f;
+        float _safePower = 1f;
         float _accumulator;
         float _cameraX;
 
@@ -95,7 +97,14 @@ namespace MonkeyPost.Game
             {
                 if (_match == null) return 1f;
                 float goalX = MatchSimulation.GoalCentre(_config, 1 - HumanTeam).X;
-                return ShotPhysics.MaxSafePower(_config, Mathf.Abs(goalX - _match.Simulation.Ball.Position.X));
+                float distance = Mathf.Abs(goalX - _match.Simulation.Ball.Position.X);
+                // The prediction runs the real ball physics, so only redo it when the distance changes.
+                if (Mathf.Abs(distance - _safePowerDistance) > 0.25f)
+                {
+                    _safePowerDistance = distance;
+                    _safePower = ShotPhysics.MaxSafePower(_config, distance);
+                }
+                return _safePower;
             }
         }
 
@@ -175,12 +184,13 @@ namespace MonkeyPost.Game
                     p.Velocity.Length,
                     id == controlled,
                     p.StunTime > 0f,
+                    p.StretchTime > 0f,
                     dt);
             }
 
             var ballPosition = Vector3.Lerp(_ballPrevious, _ballCurrent, alpha);
             float ballHeight = Mathf.Lerp(_ballHeightPrevious, _ballHeightCurrent, alpha);
-            _ball.Show(ballPosition, ballHeight, Art.ToWorld(sim.Ball.Velocity), dt);
+            _ball.Show(ballPosition, ballHeight, sim.Ball.Spin, dt);
 
             PlaceCamera(camera, ballPosition.x, dt);
         }
