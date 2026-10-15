@@ -7,237 +7,283 @@ namespace MonkeyPost.Core.Tests
     public class MatchSimulationTests
     {
         const float Dt = 1f / 30f;
-        const int Runner = 0;
-        // With player 0 as first runner, players 1..5 sit on seats 0..4 (angles 0, .2, .4, .6, .8).
-        const int TargetSeat = 1;
-        const int Target = 2;
+        const int HomeStriker = 4;
+        const int HomeDefender = 1;
+        const int AwayKeeper = 5;
+        const int AwayStriker = 9;
 
-        static MatchSimulation NewMatch(MatchConfig config = null) => new MatchSimulation(config ?? new MatchConfig(), Runner);
+        /// <summary>No random shot spread, so shots go exactly where aimed.</summary>
+        static MatchConfig Precise() => new MatchConfig { ShotSpreadBase = 0f, ShotSpreadPerPower = 0f };
 
-        static PlayerInput[] NoInput(MatchSimulation sim) => new PlayerInput[sim.Players.Count];
-
-        static bool Has(MatchSimulation sim, MatchEventType type) => sim.Events.Any(e => e.Type == type);
-
-        /// <summary>Jogs the runner until just past <see cref="TargetSeat"/>, then drops the post there.</summary>
-        static void DropBehindTarget(MatchSimulation sim)
+        static MatchSimulation InPlay(MatchConfig config = null)
         {
-            float seatAngle = Ring.SeatAngle(TargetSeat, sim.SeatCount);
-            for (int i = 0; i < 1000 && Ring.ForwardDistance(seatAngle, sim.Players[Runner].Angle) > 0.5f; i++)
-                sim.Step(NoInput(sim), Dt);
-
-            var inputs = NoInput(sim);
-            inputs[Runner].Drop = true;
-            sim.Step(inputs, Dt);
-            Assert.True(Has(sim, MatchEventType.PostDropped));
+            var sim = new MatchSimulation(config ?? Precise(), seed: 1);
+            sim.SkipKickoff();
+            // Park everyone out of the way in a column on the touchline.
+            for (int id = 0; id < MatchSimulation.PlayerCount; id++)
+                sim.PlacePlayer(id, new Vec2(14f + id * 0.9f, 0.5f), new Vec2(1f, 0f));
+            return sim;
         }
 
-        static void Check(MatchSimulation sim, int player)
-        {
-            var inputs = NoInput(sim);
-            inputs[player].Check = true;
-            sim.Step(inputs, Dt);
-        }
+        static PlayerInput[] NoInput() => new PlayerInput[MatchSimulation.PlayerCount];
 
-        /// <summary>Steps with the given sprint settings until the phase changes.</summary>
-        static void RunUntilPhaseChanges(MatchSimulation sim, bool runnerSprints, bool chaserSprints)
+        static void Step(MatchSimulation sim, PlayerInput[] inputs = null) => sim.Step(inputs ?? NoInput(), Dt);
+
+        static bool RunUntil(MatchSimulation sim, Func<bool> condition, float seconds = 5f)
         {
-            var phase = sim.Phase;
-            for (int i = 0; i < 10_000 && sim.Phase == phase; i++)
+            for (int i = 0; i < seconds / Dt; i++)
             {
-                var inputs = NoInput(sim);
-                inputs[sim.RunnerId].Sprint = runnerSprints;
-                if (sim.ChaserId >= 0) inputs[sim.ChaserId].Sprint = chaserSprints;
-                sim.Step(inputs, Dt);
+                if (condition()) return true;
+                Step(sim);
             }
-            Assert.NotEqual(phase, sim.Phase);
+            return condition();
+        }
+
+        static void GiveBall(MatchSimulation sim, int id, Vec2 at, Vec2 facing)
+        {
+            sim.PlacePlayer(id, at, facing);
+            sim.PlaceBall(at + facing.Normalized * sim.Config.DribbleOffset, Vec2.Zero, owner: id);
         }
 
         [Fact]
-        public void NewMatch_SeatsEveryoneButTheRunner()
+        public void NewMatch_LinesUpForKickoffWithTakerOnTheBall()
         {
-            var sim = NewMatch();
+            var sim = new MatchSimulation(new MatchConfig(), seed: 1, firstKickoffTeam: 1);
 
-            Assert.Equal(Phase.Circling, sim.Phase);
-            Assert.Equal(5, sim.SeatCount);
-            Assert.Equal(Role.Runner, sim.Players[Runner].Role);
-            Assert.Equal(-1, sim.Players[Runner].Seat);
-            Assert.True(sim.PostInHand);
-            for (int seat = 0; seat < sim.SeatCount; seat++)
+            Assert.Equal(Phase.Kickoff, sim.Phase);
+            Assert.Equal(MatchSimulation.PlayerId(1, MatchSimulation.KickoffSlot), sim.Ball.Owner);
+            Assert.Equal(new Vec2(18f, 10f), sim.Ball.Position);
+            foreach (var p in sim.Players)
             {
-                var occupant = sim.Players[sim.SeatOccupant(seat)];
-                Assert.Equal(Role.Sitter, occupant.Role);
-                Assert.Equal(seat, occupant.Seat);
+                bool inOwnHalf = p.Team == 0 ? p.Position.X <= 18f : p.Position.X >= 18f;
+                Assert.True(inOwnHalf, $"player {p.Id} at {p.Position}");
             }
         }
 
         [Fact]
-        public void Drop_LandsBehindTheSeatJustPassed()
+        public void Kickoff_FreezesPlayersThenStartsPlay()
         {
-            var sim = NewMatch();
-            DropBehindTarget(sim);
+            var sim = new MatchSimulation(new MatchConfig(), seed: 1);
+            var start = sim.Players[HomeDefender].Position;
+            var inputs = NoInput();
+            inputs[HomeDefender].Move = new Vec2(1f, 0f);
 
-            Assert.False(sim.PostInHand);
-            Assert.Equal(TargetSeat, sim.PostSeat);
-            var drop = sim.Events.Single(e => e.Type == MatchEventType.PostDropped);
-            Assert.Equal(Target, drop.PlayerB);
-            Assert.False(drop.IsPublic);
+            Step(sim, inputs);
+            Assert.Equal(start, sim.Players[HomeDefender].Position);
+
+            Assert.True(RunUntil(sim, () => sim.Phase == Phase.Play));
+            Step(sim, inputs);
+            Assert.NotEqual(start, sim.Players[HomeDefender].Position);
         }
 
         [Fact]
-        public void CheckingWithPostBehind_StartsChaseAndVacatesSeat()
+        public void LowShotIntoTheMouth_IsAGoal()
         {
-            var sim = NewMatch();
-            DropBehindTarget(sim);
-            Check(sim, Target);
+            var sim = InPlay();
+            GiveBall(sim, HomeStriker, new Vec2(28f, 10f), new Vec2(1f, 0f));
+            sim.PlacePlayer(AwayKeeper, new Vec2(35.5f, 3f), new Vec2(-1f, 0f)); // keeper out of position
 
-            Assert.Equal(Phase.Chase, sim.Phase);
-            Assert.Equal(Target, sim.ChaserId);
-            Assert.Equal(Role.Chaser, sim.Players[Target].Role);
-            Assert.Equal(-1, sim.SeatOccupant(TargetSeat));
-            Assert.True(Has(sim, MatchEventType.PostDiscovered));
+            var inputs = NoInput();
+            inputs[HomeStriker].Shoot = true;
+            inputs[HomeStriker].Power = 0.4f;
+            Step(sim, inputs);
+            Assert.Contains(sim.Events, e => e.Type == MatchEventType.Shot);
+
+            Assert.True(RunUntil(sim, () => sim.Phase == Phase.GoalScored));
+            Assert.Equal(1, sim.Score(0));
+            Assert.Equal(0, sim.Score(1));
+            Assert.Equal(1, sim.KickoffTeam);
         }
 
         [Fact]
-        public void QuickCheck_ChaserTagsRunner()
+        public void AfterAGoal_ConcedingTeamKicksOff()
         {
-            var sim = NewMatch();
-            DropBehindTarget(sim);
-            Check(sim, Target);
-            RunUntilPhaseChanges(sim, runnerSprints: true, chaserSprints: true);
+            var sim = InPlay();
+            GiveBall(sim, HomeStriker, new Vec2(28f, 10f), new Vec2(1f, 0f));
+            sim.PlacePlayer(AwayKeeper, new Vec2(35.5f, 3f), new Vec2(-1f, 0f));
+            var inputs = NoInput();
+            inputs[HomeStriker].Shoot = true;
+            inputs[HomeStriker].Power = 0.4f;
+            Step(sim, inputs);
 
-            Assert.Equal(Phase.Interlude, sim.Phase);
-            var tag = sim.Events.Single(e => e.Type == MatchEventType.RunnerTagged);
-            Assert.Equal(Target, tag.PlayerA);
-            Assert.Equal(Runner, tag.PlayerB);
-            Assert.Equal(sim.Config.PointsTag, sim.Players[Target].Score);
-            Assert.Equal(TargetSeat, sim.Players[Target].Seat);
-            Assert.Equal(Target, sim.SeatOccupant(TargetSeat));
-            Assert.Equal(Runner, sim.RunnerId);
+            Assert.True(RunUntil(sim, () => sim.Phase == Phase.Kickoff, seconds: 10f));
+            Assert.Equal(AwayStriker, sim.Ball.Owner);
         }
 
         [Fact]
-        public void SlowCheck_RunnerReachesSeatSafely()
+        public void FullPowerShotFromTenMetres_FliesOverThePosts()
         {
-            var sim = NewMatch();
-            DropBehindTarget(sim);
+            var sim = InPlay();
+            GiveBall(sim, HomeStriker, new Vec2(25.5f, 10f), new Vec2(1f, 0f));
+            sim.PlacePlayer(AwayKeeper, new Vec2(35.5f, 3f), new Vec2(-1f, 0f));
 
-            // Runner sprints well clear before the target notices.
-            for (int i = 0; i < 45; i++)
-            {
-                var inputs = NoInput(sim);
-                inputs[Runner].Sprint = true;
-                sim.Step(inputs, Dt);
-            }
-            Check(sim, Target);
-            Assert.Equal(Phase.Chase, sim.Phase);
-            RunUntilPhaseChanges(sim, runnerSprints: false, chaserSprints: false);
+            var inputs = NoInput();
+            inputs[HomeStriker].Shoot = true;
+            inputs[HomeStriker].Power = 1f;
+            Step(sim, inputs);
 
-            Assert.True(Has(sim, MatchEventType.RunnerSafe));
-            Assert.Equal(sim.Config.PointsRunnerSafe, sim.Players[Runner].Score);
-            Assert.Equal(Role.Sitter, sim.Players[Runner].Role);
-            Assert.Equal(TargetSeat, sim.Players[Runner].Seat);
-            Assert.Equal(Target, sim.RunnerId);
-            Assert.Equal(Role.Runner, sim.Players[Target].Role);
-            Assert.Equal(-1, sim.ChaserId);
+            // The ball should rebound off the end wall above knee height instead of scoring.
+            Assert.True(RunUntil(sim, () => sim.Ball.Velocity.X < 0f || sim.Phase != Phase.Play));
+            Assert.Equal(Phase.Play, sim.Phase);
+            Assert.Equal(0, sim.Score(0));
         }
 
         [Fact]
-        public void UnnoticedPost_IsPostedAfterAFullLap()
+        public void ShotWideOfThePosts_BouncesOffTheEndWall()
         {
-            var sim = NewMatch();
-            DropBehindTarget(sim);
-            RunUntilPhaseChanges(sim, runnerSprints: false, chaserSprints: false);
+            var sim = InPlay();
+            sim.PlaceBall(new Vec2(30f, 13f), new Vec2(15f, 0f));
 
-            var posted = sim.Events.Single(e => e.Type == MatchEventType.Posted);
-            Assert.Equal(Runner, posted.PlayerA);
-            Assert.Equal(Target, posted.PlayerB);
-            Assert.Equal(sim.Config.PointsPostedRunner, sim.Players[Runner].Score);
-            Assert.Equal(0, sim.Players[Target].Score); // -2, clamped at zero
-            Assert.Equal(Target, sim.RunnerId);
-            Assert.Equal(TargetSeat, sim.Players[Runner].Seat);
+            Assert.True(RunUntil(sim, () => sim.Ball.Velocity.X < 0f));
+            Assert.Equal(Phase.Play, sim.Phase);
+            Assert.True(sim.Ball.Position.X < sim.Config.PitchLength);
         }
 
         [Fact]
-        public void FalseCheck_CostsAPointAndStartsCooldown()
+        public void BallBouncesOffTheSideWall()
         {
-            var sim = NewMatch();
-            DropBehindTarget(sim);
-            RunUntilPhaseChanges(sim, false, false); // Posted: player 0 now sits on seat 1 with 5 points.
-            RunUntilPhaseChanges(sim, false, false); // Interlude -> next round.
-            Assert.Equal(Phase.Circling, sim.Phase);
+            var sim = InPlay();
+            sim.PlaceBall(new Vec2(10f, 15f), new Vec2(0f, 12f));
 
-            Check(sim, Runner);
-            Assert.Equal(sim.Config.PointsPostedRunner - 1, sim.Players[Runner].Score);
-            Assert.True(sim.Players[Runner].CheckCooldown > 0f);
-            Assert.True(Has(sim, MatchEventType.FalseCheck));
-
-            // Checking again during the cooldown does nothing.
-            Check(sim, Runner);
-            Assert.False(Has(sim, MatchEventType.FalseCheck));
-            Assert.Equal(sim.Config.PointsPostedRunner - 1, sim.Players[Runner].Score);
+            Assert.True(RunUntil(sim, () => sim.Ball.Velocity.Y < 0f));
+            Assert.InRange(sim.Ball.Position.Y, 0f, sim.Config.PitchWidth);
         }
 
         [Fact]
-        public void FalseCheck_NeverTakesScoreBelowZero()
+        public void LooseBall_StopsThroughFriction()
         {
-            var sim = NewMatch();
-            Check(sim, Target);
-            Assert.True(Has(sim, MatchEventType.FalseCheck));
-            Assert.Equal(0, sim.Players[Target].Score);
+            var sim = InPlay();
+            sim.PlaceBall(new Vec2(8f, 10f), new Vec2(3f, 0f));
+            Assert.True(RunUntil(sim, () => sim.Ball.Velocity == Vec2.Zero));
         }
 
         [Fact]
-        public void HoldingThePostTooLong_DropsItAutomatically()
+        public void Pass_ReachesTheTeammateItWasAimedAt()
         {
-            var sim = NewMatch();
-            for (int i = 0; i < 10_000 && sim.PostInHand; i++) sim.Step(NoInput(sim), Dt);
+            var sim = InPlay();
+            GiveBall(sim, HomeDefender, new Vec2(10f, 10f), new Vec2(1f, 0f));
+            sim.PlacePlayer(HomeStriker, new Vec2(18f, 12f), new Vec2(-1f, 0f));
 
-            Assert.False(sim.PostInHand);
-            Assert.True(sim.TimeSinceRoundStart >= sim.Config.DropDeadlineSeconds);
-            Assert.Equal(Ring.SeatJustPassed(sim.Players[Runner].Angle, sim.SeatCount), sim.PostSeat);
+            var inputs = NoInput();
+            inputs[HomeDefender].Pass = true;
+            inputs[HomeDefender].Move = new Vec2(1f, 0.2f);
+            Step(sim, inputs);
+            var pass = sim.Events.Single(e => e.Type == MatchEventType.Pass);
+            Assert.Equal(HomeStriker, pass.PlayerB);
+
+            Assert.True(RunUntil(sim, () => sim.Ball.Owner == HomeStriker));
         }
 
         [Fact]
-        public void Interlude_StartsNextRoundWithPostInHand()
+        public void SuccessfulTackle_KnocksTheBallLooseAndStunsTheCarrier()
         {
-            var sim = NewMatch();
-            DropBehindTarget(sim);
-            RunUntilPhaseChanges(sim, false, false);
-            Assert.Equal(Phase.Interlude, sim.Phase);
+            var sim = InPlay(new MatchConfig { TackleSuccessChance = 1f });
+            GiveBall(sim, AwayStriker, new Vec2(20f, 10f), new Vec2(-1f, 0f));
+            sim.PlacePlayer(HomeDefender, new Vec2(18.6f, 10f), new Vec2(1f, 0f));
 
-            RunUntilPhaseChanges(sim, false, false);
-            Assert.Equal(Phase.Circling, sim.Phase);
-            Assert.True(sim.PostInHand);
-            Assert.True(Has(sim, MatchEventType.RoundStarted));
+            var inputs = NoInput();
+            inputs[HomeDefender].Tackle = true;
+            Step(sim, inputs);
+
+            Assert.Contains(sim.Events, e => e.Type == MatchEventType.Tackle && e.PlayerA == HomeDefender);
+            Assert.NotEqual(AwayStriker, sim.Ball.Owner);
+            Assert.True(sim.Players[AwayStriker].StunTime > 0f);
+        }
+
+        [Fact]
+        public void MissedTackle_StunsTheTackler()
+        {
+            var sim = InPlay(new MatchConfig { TackleSuccessChance = 0f });
+            GiveBall(sim, AwayStriker, new Vec2(20f, 10f), new Vec2(-1f, 0f));
+            sim.PlacePlayer(HomeDefender, new Vec2(18.6f, 10f), new Vec2(1f, 0f));
+
+            var inputs = NoInput();
+            inputs[HomeDefender].Tackle = true;
+            Step(sim, inputs);
+
+            Assert.Contains(sim.Events, e => e.Type == MatchEventType.TackleMissed);
+            Assert.Equal(AwayStriker, sim.Ball.Owner);
+            Assert.True(sim.Players[HomeDefender].StunTime > 0f);
+        }
+
+        [Fact]
+        public void Keeper_DeflectsAPowerfulShotStraightAtThem()
+        {
+            var sim = InPlay();
+            GiveBall(sim, HomeStriker, new Vec2(28f, 10f), new Vec2(1f, 0f));
+            sim.PlacePlayer(AwayKeeper, new Vec2(35f, 10f), new Vec2(-1f, 0f));
+
+            var inputs = NoInput();
+            inputs[HomeStriker].Shoot = true;
+            inputs[HomeStriker].Power = 0.6f;
+            Step(sim, inputs);
+
+            bool saved = false;
+            RunUntil(sim, () => saved |= sim.Events.Any(e => e.Type == MatchEventType.Save && e.PlayerA == AwayKeeper), 2f);
+            Assert.True(saved);
+            Assert.Equal(0, sim.Score(0));
+        }
+
+        [Fact]
+        public void Keeper_CannotLeaveTheirBox()
+        {
+            var sim = InPlay();
+            sim.PlacePlayer(AwayKeeper, new Vec2(34f, 10f), new Vec2(-1f, 0f));
+            var inputs = NoInput();
+            inputs[AwayKeeper].Move = new Vec2(-1f, 0f);
+            inputs[AwayKeeper].Sprint = true;
+            for (int i = 0; i < 60; i++) Step(sim, inputs);
+
+            Assert.True(MatchSimulation.InKeeperBox(sim.Config, 1, sim.Players[AwayKeeper].Position));
+        }
+
+        [Fact]
+        public void OutfieldPlayers_CannotParkInTheirOwnBox()
+        {
+            var sim = InPlay();
+            sim.PlacePlayer(HomeDefender, new Vec2(6f, 10f), new Vec2(-1f, 0f));
+            var inputs = NoInput();
+            inputs[HomeDefender].Move = new Vec2(-1f, 0f);
+            for (int i = 0; i < 60; i++) Step(sim, inputs);
+
+            Assert.False(MatchSimulation.InKeeperBox(sim.Config, 0, sim.Players[HomeDefender].Position));
+        }
+
+        [Fact]
+        public void Sprinting_IsFasterAndDrainsStamina()
+        {
+            var sim = InPlay();
+            sim.PlacePlayer(1, new Vec2(10f, 6f), new Vec2(1f, 0f));
+            sim.PlacePlayer(2, new Vec2(10f, 14f), new Vec2(1f, 0f));
+            var inputs = NoInput();
+            inputs[1].Move = new Vec2(1f, 0f);
+            inputs[2].Move = new Vec2(1f, 0f);
+            inputs[2].Sprint = true;
+            for (int i = 0; i < 30; i++) Step(sim, inputs);
+
+            Assert.True(sim.Players[2].Position.X > sim.Players[1].Position.X + 1f);
+            Assert.True(sim.Players[2].Stamina < sim.Players[1].Stamina);
         }
 
         [Fact]
         public void Clock_EndsMatchOnceAndThenFreezes()
         {
-            var sim = NewMatch(new MatchConfig { MatchDurationSeconds = 2f });
+            var sim = new MatchSimulation(new MatchConfig { MatchDurationSeconds = 2f }, seed: 1);
             int ends = 0;
             for (int i = 0; i < 120; i++)
             {
-                sim.Step(NoInput(sim), Dt);
+                Step(sim);
                 ends += sim.Events.Count(e => e.Type == MatchEventType.MatchEnded);
             }
-
             Assert.Equal(1, ends);
             Assert.Equal(Phase.Ended, sim.Phase);
-            Assert.Equal(0f, sim.TimeRemaining);
         }
 
         [Fact]
         public void Step_RejectsWrongInputCount()
         {
-            var sim = NewMatch();
-            Assert.Throws<ArgumentException>(() => sim.Step(new PlayerInput[2], Dt));
-        }
-
-        [Fact]
-        public void Config_RejectsTooFewPlayers()
-        {
-            Assert.Throws<ArgumentException>(() => new MatchSimulation(new MatchConfig { PlayerCount = 2 }, 0));
+            var sim = new MatchSimulation(new MatchConfig(), seed: 1);
+            Assert.Throws<ArgumentException>(() => sim.Step(new PlayerInput[3], Dt));
         }
     }
 }

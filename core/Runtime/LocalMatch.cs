@@ -4,55 +4,117 @@ using MonkeyPost.Core.Bots;
 namespace MonkeyPost.Core
 {
     /// <summary>
-    /// Runs a match on this device: the simulation plus a bot for every seat not controlled by a
-    /// person. Used for offline play and by the host in local multiplayer.
+    /// Runs a match on this device. Each team is either a bot team or a person's team; a person
+    /// controls whichever footballer is best placed (auto-switch, like most football games) and
+    /// bots move their teammates. Used offline and by the host phone in local 1v1.
     /// </summary>
     public sealed class LocalMatch
     {
-        readonly BotBrain[] _bots;
-        readonly PlayerInput[] _inputs;
-        readonly MatchSnapshot _botView = new MatchSnapshot();
+        /// <summary>A person's control only jumps to a teammate this much closer to the ball.</summary>
+        const float SwitchHysteresis = 2f;
+
+        /// <summary>How well a person's AI teammates play.</summary>
+        public const BotDifficulty TeammateDifficulty = BotDifficulty.Medium;
+
+        readonly TeamBrain[] _brains = new TeamBrain[2];
+        readonly bool[] _human = new bool[2];
+        readonly int[] _controlled = { -1, -1 };
+        readonly PlayerInput[] _humanInputs = new PlayerInput[2];
+        readonly PlayerInput[] _inputs = new PlayerInput[MatchSimulation.PlayerCount];
+        readonly MatchSnapshot _view = new MatchSnapshot();
 
         public MatchSimulation Simulation { get; }
 
-        /// <param name="bots">One entry per player: a difficulty for bot seats, null for human seats.</param>
-        public LocalMatch(MatchConfig config, BotDifficulty?[] bots, ulong seed)
+        /// <param name="home">Bot difficulty for the home team, or null if a person plays it.</param>
+        /// <param name="away">Bot difficulty for the away team, or null if a person plays it.</param>
+        public LocalMatch(MatchConfig config, BotDifficulty? home, BotDifficulty? away, ulong seed)
         {
             if (config == null) throw new ArgumentNullException(nameof(config));
-            if (bots == null) throw new ArgumentNullException(nameof(bots));
-            if (bots.Length != config.PlayerCount)
-                throw new ArgumentException($"Expected {config.PlayerCount} seats, got {bots.Length}.", nameof(bots));
-
             var rng = new DeterministicRandom(seed);
-            Simulation = new MatchSimulation(config, rng.Next(config.PlayerCount));
+            Simulation = new MatchSimulation(config, rng.NextULong(), rng.Next(2));
 
-            _inputs = new PlayerInput[config.PlayerCount];
-            _bots = new BotBrain[config.PlayerCount];
-            for (int id = 0; id < bots.Length; id++)
+            var difficulties = new[] { home, away };
+            for (int team = 0; team < 2; team++)
             {
-                if (bots[id] is BotDifficulty difficulty)
-                    _bots[id] = new BotBrain(id, BotProfile.For(difficulty), rng.NextULong());
+                _human[team] = !difficulties[team].HasValue;
+                var profile = BotProfile.For(difficulties[team] ?? TeammateDifficulty);
+                _brains[team] = new TeamBrain(team, config, profile, rng.NextULong());
+                if (_human[team]) _controlled[team] = MatchSimulation.PlayerId(team, MatchSimulation.KickoffSlot);
             }
         }
 
-        public bool IsBot(int playerId) => _bots[playerId] != null;
+        public bool IsHuman(int team) => _human[team];
 
-        /// <summary>Sets a human player's controls for the next tick.</summary>
-        public void SetInput(int playerId, PlayerInput input)
+        /// <summary>The footballer a person is controlling on <paramref name="team"/>, or -1 for a bot team.</summary>
+        public int ControlledPlayer(int team) => _controlled[team];
+
+        /// <summary>
+        /// Sets a person's controls. Movement and sprint persist until changed; pass, shoot,
+        /// tackle and switch are single presses consumed by the next tick.
+        /// </summary>
+        public void SetInput(int team, PlayerInput input)
         {
-            if (_bots[playerId] != null) throw new InvalidOperationException($"Player {playerId} is a bot.");
-            _inputs[playerId] = input;
+            if (!_human[team]) throw new InvalidOperationException($"Team {team} is played by bots.");
+            _humanInputs[team] = input;
         }
 
         public void Tick(float dt)
         {
-            for (int id = 0; id < _bots.Length; id++)
+            _view.CopyFrom(Simulation);
+            for (int team = 0; team < 2; team++)
             {
-                if (_bots[id] == null) continue;
-                _botView.CopyFrom(Simulation, id);
-                _inputs[id] = _bots[id].Think(_botView, dt);
+                if (_human[team]) UpdateControl(team, _humanInputs[team].Switch);
+                _brains[team].Think(_view, dt, _controlled[team], _inputs);
+                if (_human[team])
+                {
+                    _inputs[_controlled[team]] = _humanInputs[team];
+                    ref var held = ref _humanInputs[team];
+                    held.Pass = held.Shoot = held.Tackle = held.Switch = false;
+                }
             }
             Simulation.Step(_inputs, dt);
+        }
+
+        void UpdateControl(int team, bool switchPressed)
+        {
+            var ball = _view.Ball;
+            if (ball.Owner >= 0 && MatchSimulation.TeamOf(ball.Owner) == team)
+            {
+                // Always control our ball carrier, except the keeper, who clears it automatically.
+                if (!_view.Players[ball.Owner].IsKeeper) _controlled[team] = ball.Owner;
+                return;
+            }
+
+            int nearest = -1, second = -1;
+            float nearestDistance = float.MaxValue, secondDistance = float.MaxValue;
+            for (int slot = 1; slot < MatchSimulation.PlayersPerTeam; slot++)
+            {
+                int id = MatchSimulation.PlayerId(team, slot);
+                float distance = Vec2.Distance(_view.Players[id].Position, ball.Position);
+                if (distance < nearestDistance)
+                {
+                    second = nearest;
+                    secondDistance = nearestDistance;
+                    nearest = id;
+                    nearestDistance = distance;
+                }
+                else if (distance < secondDistance)
+                {
+                    second = id;
+                    secondDistance = distance;
+                }
+            }
+
+            int current = _controlled[team];
+            if (switchPressed)
+            {
+                _controlled[team] = nearest != current ? nearest : second;
+                return;
+            }
+
+            float currentDistance = Vec2.Distance(_view.Players[current].Position, ball.Position);
+            if (nearest != current && currentDistance - nearestDistance > SwitchHysteresis)
+                _controlled[team] = nearest;
         }
     }
 }

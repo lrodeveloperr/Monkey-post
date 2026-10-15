@@ -5,75 +5,84 @@ namespace MonkeyPost.Core
     public readonly struct PlayerSnapshot
     {
         public readonly int Id;
-        public readonly Role Role;
-        public readonly int Seat;
-        public readonly float Angle;
+        public readonly int Team;
+        public readonly int Slot;
+        public readonly Vec2 Position;
+        public readonly Vec2 Velocity;
+        public readonly Vec2 Facing;
         public readonly float Stamina;
         public readonly bool IsSprinting;
-        public readonly int Score;
-        public readonly float CheckCooldown;
+        public readonly bool IsStunned;
 
         public PlayerSnapshot(PlayerState p)
         {
             Id = p.Id;
-            Role = p.Role;
-            Seat = p.Seat;
-            Angle = p.Angle;
+            Team = p.Team;
+            Slot = p.Slot;
+            Position = p.Position;
+            Velocity = p.Velocity;
+            Facing = p.Facing;
             Stamina = p.Stamina;
             IsSprinting = p.IsSprinting;
-            Score = p.Score;
-            CheckCooldown = p.CheckCooldown;
+            IsStunned = p.StunTime > 0f;
+        }
+
+        public bool IsKeeper => Slot == 0;
+    }
+
+    public readonly struct BallSnapshot
+    {
+        public readonly Vec2 Position;
+        public readonly Vec2 Velocity;
+        public readonly float Height;
+        public readonly int Owner;
+
+        public BallSnapshot(BallState b)
+        {
+            Position = b.Position;
+            Velocity = b.Velocity;
+            Height = b.Height;
+            Owner = b.Owner;
         }
     }
 
     /// <summary>
-    /// What one player is allowed to know about the match. This is the only view given to bots,
-    /// the UI and (in local multiplayer) guest phones, so the post's location never leaks.
+    /// A read-only copy of the match: what bots decide from, what the UI renders and (in local
+    /// multiplayer) what the host sends to the guest phone.
     /// </summary>
     public sealed class MatchSnapshot
     {
-        /// <summary>The player this snapshot was taken for, or -1 for a spectator view.</summary>
-        public int ViewerId { get; private set; } = -1;
         public Phase Phase { get; private set; }
         public float TimeRemaining { get; private set; }
-        public float TimeSinceRoundStart { get; private set; }
-        public int RunnerId { get; private set; }
-        public int ChaserId { get; private set; }
-        public int SeatCount { get; private set; }
+        public int HomeScore { get; private set; }
+        public int AwayScore { get; private set; }
+        public int KickoffTeam { get; private set; }
+        public BallSnapshot Ball { get; private set; }
         public PlayerSnapshot[] Players { get; private set; } = Array.Empty<PlayerSnapshot>();
 
-        /// <summary>True only for the runner while they still hold the post.</summary>
-        public bool ViewerHoldsPost { get; private set; }
-
-        /// <summary>The post's seat if the viewer is the runner and has dropped it, otherwise -1.</summary>
-        public int ViewerKnownPostSeat { get; private set; } = -1;
-
-        public static MatchSnapshot Capture(MatchSimulation sim, int viewerId)
+        public static MatchSnapshot Capture(MatchSimulation sim)
         {
             var snapshot = new MatchSnapshot();
-            snapshot.CopyFrom(sim, viewerId);
+            snapshot.CopyFrom(sim);
             return snapshot;
         }
 
         /// <summary>Refreshes this snapshot in place, reusing its buffers.</summary>
-        public void CopyFrom(MatchSimulation sim, int viewerId)
+        public void CopyFrom(MatchSimulation sim)
         {
             if (sim == null) throw new ArgumentNullException(nameof(sim));
 
-            ViewerId = viewerId;
             Phase = sim.Phase;
             TimeRemaining = sim.TimeRemaining;
-            TimeSinceRoundStart = sim.TimeSinceRoundStart;
-            RunnerId = sim.RunnerId;
-            ChaserId = sim.ChaserId;
-            SeatCount = sim.SeatCount;
+            HomeScore = sim.Score(0);
+            AwayScore = sim.Score(1);
+            KickoffTeam = sim.KickoffTeam;
+            Ball = new BallSnapshot(sim.Ball);
 
             if (Players.Length != sim.Players.Count) Players = new PlayerSnapshot[sim.Players.Count];
             for (int i = 0; i < Players.Length; i++) Players[i] = new PlayerSnapshot(sim.Players[i]);
-
-            bool viewerIsRunner = viewerId == sim.RunnerId && sim.Phase == Phase.Circling;
-            ViewerHoldsPost = viewerIsRunner && sim.PostInHand;
-            ViewerKnownPostSeat = viewerIsRunner && !sim.PostInHand ? sim.PostSeat : -1;
         }
+
+        public int Score(int team) => team == 0 ? HomeScore : AwayScore;
     }
 }
