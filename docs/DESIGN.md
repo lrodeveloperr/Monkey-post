@@ -158,14 +158,28 @@ A person's AI teammates always play at Medium.
 - Seeded randomness, so a match replays identically from its seed (useful for bug reports).
 
 ### Local 1v1 (Nearby Connections)
-- **Two phones, one team each.** One phone hosts (advertises), the other joins (discovers).
+
+**Status: confirmed by owner (Part 4).**
+
+- **Two phones, one team each.** Each player brings **their own customised team** (name, kit,
+  badge). If the kits clash, the away team switches to its second kit automatically.
+- **Pairing:** one phone taps **Host**; the other taps **Join**, sees nearby hosts listed by team
+  name, and taps one. Both phones then show the same 4-digit code to confirm they're connected to
+  the right phone (Nearby Connections provides this code).
 - **Host-authoritative:** only the host runs the simulation. The guest sends its controls (move,
   sprint, pass, shoot, tackle, switch) and receives snapshots about 15 times a second, rendering
   with interpolation. The guest's own movement is predicted locally to hide latency.
+- **Fairness:** the host's own controls are delayed by the measured guest latency, so neither
+  player has an advantage.
+- **Draws:** a level 1v1 goes to **golden goal**.
+- **Disconnects:** the match pauses for up to **10 seconds** while the phones try to reconnect.
+  If they can't, a bot takes over the missing team and the remaining player finishes the match.
+- **After the match:** a **Rematch** button. If both players tap it, a new match starts on the
+  same connection; otherwise both go back to the menu.
+- No pausing in 1v1.
 - Works over Bluetooth / Wi-Fi with **no internet and no server**.
 - Unity has no official Nearby plugin, so we ship a small Kotlin Android library (AAR) that
   wraps the Nearby Connections API and talks to Unity through `AndroidJavaProxy`.
-- If either phone leaves, the match ends.
 
 ### No backend
 Nothing runs on any server we operate. Player progress and unlocks live on the device and in Play
