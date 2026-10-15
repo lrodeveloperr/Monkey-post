@@ -1,0 +1,30 @@
+# .NET
+bin/
+obj/
+*.user
+TestResults/
+
+# Unity
+/unity/[Ll]ibrary/
+/unity/[Tt]emp/
+/unity/[Oo]bj/
+/unity/[Bb]uild/
+/unity/[Bb]uilds/
+/unity/[Ll]ogs/
+/unity/[Uu]ser[Ss]ettings/
+/unity/MemoryCaptures/
+*.apk
+*.aab
+*.keystore
+*.jks
+
+# Android / Gradle
+.gradle/
+local.properties
+/android/**/build/
+
+# OS / editors
+.DS_Store
+.idea/
+.vs/
+.vscode/
