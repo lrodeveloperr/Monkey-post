@@ -30,6 +30,9 @@ a fast 5-a-side version: 4 outfield players and a keeper who may only use their 
 
 ## 2. Game rules (v1)
 
+**Status: confirmed by owner (Part 1).** Match length, draws, own-box ban, knee-height goals, no
+fouls, computer-controlled keeper, 1.8 m goals and keeper staying in the box were all confirmed.
+
 | Rule | Value | Why |
 |---|---|---|
 | Pitch | 36 m × 20 m, walled | Typical cage/futsal size. The ball always stays in play. |
