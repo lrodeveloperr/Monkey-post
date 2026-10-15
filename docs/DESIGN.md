@@ -225,6 +225,25 @@ A Medium win with two goals pays (20 + 20 + 30) × 1.5 = 105 coins, so a common 
 
 ---
 
+## 3d. Settings and accessibility
+
+**Status: confirmed by owner (Part 11).**
+
+| Setting | Options |
+|---|---|
+| Language | English / French (defaults to the phone's language) |
+| Country | Changes the opponent teams |
+| Left-handed layout | Mirrors the controls: joystick right, buttons left |
+| Control size and transparency | Sliders for the joystick and buttons |
+| Colour-blind friendly kits | Forces strongly contrasting kits and shows a marker above your team's players |
+| Battery saver | Lower graphics detail and a lower frame-rate cap |
+| Sound | Separate sliders for crowd, sound effects (kicks, whistle) and menu ambience |
+| Haptics | On / off |
+| Play Games | Sign in to back up progress / sign out |
+| Privacy | Ad consent options (UMP), privacy policy link |
+
+---
+
 ## 4. Architecture
 
 ```
@@ -400,7 +419,7 @@ policies.
 
 ## 8. Localization
 
-**English and French only** (owner decision, Part 3). Together they cover Nigeria, Ghana, Kenya,
+**Status: confirmed by owner (Parts 3 and 10).** **English and French only.** Together they cover Nigeria, Ghana, Kenya,
 Cameroon, Senegal and Côte d'Ivoire, plus the diaspora.
 
 - Plain English and French throughout, with no Pidgin or other local-language flavour.
@@ -408,7 +427,8 @@ Cameroon, Senegal and Côte d'Ivoire, plus the diaspora.
   English) and can be changed in settings.
 - UI is **icon-first** (football is universal) so there are few strings to translate.
 - Unity Localization package. Both languages use Latin script, so no extra font packs are needed.
-- Claude drafts the French; a native French speaker reviews it before launch.
+- Claude drafts the French. **A native French speaker the owner knows reviews the full string
+  list before launch.**
 - Store listing in English and French.
 
 ---
